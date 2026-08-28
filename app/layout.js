@@ -81,6 +81,9 @@ export default async function RootLayout({ children }) {
                 {(profile?.role === "senior" || profile?.role === "bid_team") && (
                   <a className="navbtn" href="/search">Tender search</a>
                 )}
+                {profile?.role === "senior" && (
+                  <a className="navbtn" href="/admin/line-managers">Line managers (bulk import)</a>
+                )}
               </nav>
               <div style={{ marginTop: "auto" }}>
                 <SignOutButton />
