@@ -33,9 +33,9 @@ export default function Home() {
       </div>
 
       <p style={{ fontSize: 13.5, color: "#5c6b78", lineHeight: 1.6, marginBottom: 20 }}>
-        Filling it in properly takes more like 15–20 minutes the first time, given how much it
-        covers — but you don't have to do it all in one sitting, and it's much quicker to keep
-        up to date after that. A senior reviewer may adjust or verify your competency ratings,
+        Filling it in properly takes more like 30 minutes to an hour the first time, given how
+        much it covers — but you don't have to do it all in one sitting, and it's much quicker to
+        keep up to date after that. A senior reviewer may adjust or verify your competency ratings,
         but everything else is entirely in your hands.
       </p>
 
