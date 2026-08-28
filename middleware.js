@@ -36,7 +36,7 @@ export async function middleware(request) {
 
   if (user && isLoginPage) {
     const url = request.nextUrl.clone();
-    url.pathname = "/staff";
+    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 
