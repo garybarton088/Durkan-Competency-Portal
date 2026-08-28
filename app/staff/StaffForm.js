@@ -130,7 +130,7 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
     setQuals((prev) => prev.filter((q) => q.id !== id));
   }
 
-  async function saveAssessment(catId, submit) {
+  async function saveAssessment(catId) {
     const current = assessments[catId];
     const payload = {
       staff_id: userId,
@@ -138,7 +138,7 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
       level: current.level,
       evidence: current.evidence,
       last_assessed: new Date().toISOString().slice(0, 10),
-      status: submit ? "pending_verification" : "self_assessed",
+      status: "self_assessed",
     };
     const { data } = await supabase
       .from("competency_assessments")
@@ -332,25 +332,34 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
       </Section>
 
       <Section title="Competency self-assessment">
-        <p style={{ fontSize: 11.5, color: "#7a7666", marginTop: -6, marginBottom: 12 }}>
-          Submitting sends your entry to a senior for verification. Until verified it won't count as compliant for tenders.
+        <p style={{ fontSize: 11.5, color: "#7a7666", marginTop: -6, marginBottom: 10 }}>
+          Rate yourself honestly against each area below. A senior reviewer can verify or adjust these at any time — you don't need to submit anything separately.
         </p>
+        <div style={{ background: "#F0EDE4", borderRadius: 4, padding: "10px 12px", marginBottom: 16 }}>
+          <div className="lbl" style={{ marginBottom: 6 }}>What the scores mean</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", fontSize: 12 }}>
+            {LEVELS.map((l, i) => (
+              <span key={i}><strong>{i}</strong> {l}</span>
+            ))}
+          </div>
+        </div>
         {categories.map((c) => {
           const a = assessments[c.id];
           return (
             <div key={c.id} style={{ borderTop: "1px solid var(--line)", padding: "12px 0" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</span>
                 <span
                   style={{
                     fontSize: 11,
                     fontWeight: 600,
-                    color: a.status === "verified" ? "var(--sage)" : a.status === "pending_verification" ? "var(--amber)" : "#9b9787",
+                    color: a.status === "verified" ? "var(--sage)" : "#9b9787",
                   }}
                 >
-                  {a.status === "verified" ? "Verified" : a.status === "pending_verification" ? "Pending verification" : "Self-assessed only"}
+                  {a.status === "verified" ? "Verified" : "Not yet verified"}
                 </span>
               </div>
+              <p style={{ fontSize: 12, color: "#7a7666", margin: "2px 0 8px" }}>{c.description}</p>
               <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 10, marginBottom: 8 }}>
                 <select
                   className="fld"
@@ -369,10 +378,7 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
                 />
               </div>
               {a.status !== "verified" && (
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn" onClick={() => saveAssessment(c.id, false)}>{savedCat === c.id ? "Saved" : "Save draft"}</button>
-                  <button className="btn primary" onClick={() => saveAssessment(c.id, true)}>Submit for verification</button>
-                </div>
+                <button className="btn" onClick={() => saveAssessment(c.id)}>{savedCat === c.id ? "Saved" : "Save"}</button>
               )}
             </div>
           );
