@@ -96,6 +96,12 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
     )
   );
   const [savedCat, setSavedCat] = useState(null);
+  const [lastSaved, setLastSaved] = useState(
+    Object.fromEntries(categories.map((c) => {
+      const existing = initialAssessments.find((a) => a.category_id === c.id);
+      return [c.id, { level: existing?.level || 0, evidence: existing?.evidence || "" }];
+    }))
+  );
 
   const [confirmedAt, setConfirmedAt] = useState(profile?.profile_confirmed_at || null);
   const [confirming, setConfirming] = useState(false);
@@ -218,7 +224,10 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
       .upsert(payload, { onConflict: "staff_id,category_id" })
       .select()
       .single();
-    if (data) setAssessments((prev) => ({ ...prev, [catId]: data }));
+    if (data) {
+      setAssessments((prev) => ({ ...prev, [catId]: data }));
+      setLastSaved((prev) => ({ ...prev, [catId]: { level: data.level, evidence: data.evidence } }));
+    }
     setSavedCat(catId);
     setTimeout(() => setSavedCat(null), 1500);
   }
@@ -525,6 +534,11 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
         <p style={{ fontSize: 11.5, color: "#5c6b78", marginTop: -6, marginBottom: 10 }}>
           Rate yourself honestly against each area below. A senior reviewer can verify or adjust these at any time — you don't need to submit anything separately.
         </p>
+        {Object.keys(assessments).some((catId) => assessments[catId].level !== lastSaved[catId]?.level || assessments[catId].evidence !== lastSaved[catId]?.evidence) && (
+          <div style={{ background: "#FFF8EC", border: "1px solid #C77D0A", borderRadius: 4, padding: "8px 12px", marginBottom: 14, fontSize: 12.5, color: "#8a5a06", fontWeight: 600 }}>
+            You have unsaved ratings below — each area has its own Save button, so make sure to click it for every one you've changed.
+          </div>
+        )}
         <div style={{ background: "#EAF2EF", borderRadius: 4, padding: "10px 12px", marginBottom: 16 }}>
           <div className="lbl" style={{ marginBottom: 8 }}>What the scores mean</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -538,18 +552,28 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
         </div>
         {categories.map((c) => {
           const a = assessments[c.id];
+          const isDirty = a.level !== lastSaved[c.id]?.level || a.evidence !== lastSaved[c.id]?.evidence;
           return (
-            <div key={c.id} style={{ borderTop: "1px solid var(--line)", padding: "12px 0" }}>
+            <div
+              key={c.id}
+              style={{
+                borderTop: "1px solid var(--line)",
+                padding: "12px",
+                margin: "0 -12px",
+                background: isDirty ? "#FFF8EC" : "transparent",
+                borderLeft: isDirty ? "3px solid #C77D0A" : "3px solid transparent",
+              }}
+            >
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</span>
                 <span
                   style={{
                     fontSize: 11,
                     fontWeight: 600,
-                    color: a.status === "verified" ? "var(--sage)" : "#8a97a1",
+                    color: isDirty ? "#C77D0A" : a.status === "verified" ? "var(--sage)" : "#8a97a1",
                   }}
                 >
-                  {a.status === "verified" ? "Verified" : "Not yet verified"}
+                  {isDirty ? "Unsaved changes" : a.status === "verified" ? "Verified" : "Not yet verified"}
                 </span>
               </div>
               <p style={{ fontSize: 12, color: "#5c6b78", margin: "2px 0 8px" }}>{c.description}</p>
@@ -575,7 +599,9 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
                 Name the project or situation and what you actually did — specifics help a reviewer trust the rating.
               </p>
               {a.status !== "verified" && (
-                <button className="btn" onClick={() => saveAssessment(c.id)}>{savedCat === c.id ? "Saved" : "Save"}</button>
+                <button className={isDirty ? "btn primary" : "btn"} onClick={() => saveAssessment(c.id)}>
+                  {savedCat === c.id ? "Saved" : isDirty ? "Save this rating" : "Save"}
+                </button>
               )}
             </div>
           );
