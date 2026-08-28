@@ -74,7 +74,7 @@ export default async function RootLayout({ children }) {
               <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <a className="navbtn" href="/staff">My profile</a>
                 {profile?.role === "senior" && (
-                  <a className="navbtn" href="/verify">Verify submissions</a>
+                  <a className="navbtn" href="/verify">Verify competencies</a>
                 )}
                 {(profile?.role === "senior" || profile?.role === "bid_team") && (
                   <a className="navbtn" href="/search">Tender search</a>
