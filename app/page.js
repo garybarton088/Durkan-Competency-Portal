@@ -32,7 +32,7 @@ export default function Home() {
         </p>
       </div>
 
-      <p style={{ fontSize: 13.5, color: "#7a7666", lineHeight: 1.6, marginBottom: 20 }}>
+      <p style={{ fontSize: 13.5, color: "#5c6b78", lineHeight: 1.6, marginBottom: 20 }}>
         Filling it in properly takes more like 15–20 minutes the first time, given how much it
         covers — but you don't have to do it all in one sitting, and it's much quicker to keep
         up to date after that. A senior reviewer may adjust or verify your competency ratings,
@@ -41,7 +41,7 @@ export default function Home() {
 
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
         <h3 style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 12 }}>What to do</h3>
-        <p style={{ fontSize: 13, color: "#7a7666", marginBottom: 12 }}>
+        <p style={{ fontSize: 13, color: "#5c6b78", marginBottom: 12 }}>
           Your profile is split into six tabs — work through them in order, or jump straight to
           whichever needs updating:
         </p>
