@@ -3,7 +3,15 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-const LEVELS = ["Not assessed", "Awareness", "Developing", "Working", "Practitioner", "Expert"];
+const LEVELS = ["Not assessed", "Just starting", "Getting there", "Solid & dependable", "Very strong", "Expert"];
+const LEVEL_DESCRIPTIONS = [
+  "Haven't rated this yet.",
+  "Aware of it, but still learning the basics.",
+  "Building experience — not fully independent yet.",
+  "Can be trusted to do this well day-to-day without supervision.",
+  "Often the person others turn to for this.",
+  "Could teach or mentor others in this area.",
+];
 
 function Section({ title, children }) {
   return (
@@ -336,10 +344,13 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
           Rate yourself honestly against each area below. A senior reviewer can verify or adjust these at any time — you don't need to submit anything separately.
         </p>
         <div style={{ background: "#F0EDE4", borderRadius: 4, padding: "10px 12px", marginBottom: 16 }}>
-          <div className="lbl" style={{ marginBottom: 6 }}>What the scores mean</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", fontSize: 12 }}>
+          <div className="lbl" style={{ marginBottom: 8 }}>What the scores mean</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             {LEVELS.map((l, i) => (
-              <span key={i}><strong>{i}</strong> {l}</span>
+              <div key={i} style={{ fontSize: 12, display: "flex", gap: 8 }}>
+                <strong style={{ minWidth: 130, flexShrink: 0 }}>{i} · {l}</strong>
+                <span style={{ color: "#7a7666" }}>{LEVEL_DESCRIPTIONS[i]}</span>
+              </div>
             ))}
           </div>
         </div>
