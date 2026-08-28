@@ -46,7 +46,7 @@ export default function LoginPage({ searchParams }) {
               <input className="fld" type="password" name="password" required minLength={8} />
             </div>
             <button className="btn" style={{ justifyContent: "center" }}>Create account</button>
-            <p style={{ fontSize: 11, color: "#8a8676" }}>
+            <p style={{ fontSize: 11, color: "#6b7a86" }}>
               New accounts start with staff-level access. A senior person can upgrade you to
               senior or bid_team in the Supabase table editor (profiles table, role column).
             </p>
