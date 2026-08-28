@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
 import VerifyPanel from "./VerifyPanel";
 
 export default async function VerifyPage() {
@@ -9,15 +8,16 @@ export default async function VerifyPage() {
   } = await supabase.auth.getUser();
   const { data: myProfile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
 
-  if (myProfile?.role !== "senior") {
-    redirect("/staff");
-  }
-
-  const { data: pending } = await supabase
+  const { data: allPending } = await supabase
     .from("competency_assessments")
-    .select("*, profiles!competency_assessments_staff_id_fkey(full_name, job_title, department), competency_categories(name)")
-    .eq("status", "pending_verification")
+    .select("*, profiles!competency_assessments_staff_id_fkey(full_name, job_title, department, line_manager_id), competency_categories(name)")
+    .eq("status", "self_assessed")
     .order("updated_at", { ascending: true });
 
-  return <VerifyPanel initialPending={pending || []} />;
+  const isSenior = myProfile?.role === "senior";
+  const pending = isSenior
+    ? allPending || []
+    : (allPending || []).filter((p) => p.profiles?.line_manager_id === user.id);
+
+  return <VerifyPanel initialPending={pending} isSenior={isSenior} />;
 }
