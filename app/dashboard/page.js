@@ -29,11 +29,12 @@ export default async function DashboardPage() {
     redirect("/staff");
   }
 
-  const [{ data: profiles }, { data: categories }, { data: assessments }, { data: quals }] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, job_title, business_division, cscs_card_type, cscs_expiry_date, profile_confirmed_at"),
+  const [{ data: profiles }, { data: categories }, { data: assessments }, { data: quals }, { data: gatewayExp }] = await Promise.all([
+    supabase.from("profiles").select("id, full_name, job_title, business_division, cscs_card_type, cscs_expiry_date, profile_confirmed_at, currently_on_hrb, current_hrb_project"),
     supabase.from("competency_categories").select("*").order("sort_order"),
     supabase.from("competency_assessments").select("staff_id, category_id, level, status"),
     supabase.from("qualifications").select("id, staff_id, name, expiry_date, profiles!qualifications_staff_id_fkey(full_name)").not("expiry_date", "is", null),
+    supabase.from("gateway_experience").select("staff_id, project_name, gateway_stage, profiles!gateway_experience_staff_id_fkey(full_name)"),
   ]);
 
   const allProfiles = profiles || [];
@@ -64,6 +65,11 @@ export default async function DashboardPage() {
 
   const alerts = [...cscsAlerts, ...qualAlerts].sort((a, b) => a.days - b.days);
 
+  const hrbStaff = allProfiles.filter((p) => p.currently_on_hrb);
+  const gatewayList = gatewayExp || [];
+  const hrbRelevantIds = new Set([...hrbStaff.map((p) => p.id), ...gatewayList.map((g) => g.staff_id)]);
+  const hrbRelevantCount = hrbRelevantIds.size;
+
   return (
     <div>
       <h2 style={{ fontSize: 19, fontWeight: 600, marginBottom: 2 }}>Coverage & compliance</h2>
@@ -71,11 +77,12 @@ export default async function DashboardPage() {
         A company-wide view of profile completion, competency coverage, and upcoming expiries.
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 24 }}>
         <Metric label="Total staff" value={totalStaff} />
         <Metric label="Profiles confirmed" value={`${confirmedPct}%`} accent={confirmedPct < 60 ? "var(--brick)" : undefined} />
         <Metric label="Awaiting verification" value={verificationBacklog} accent={verificationBacklog > 0 ? "var(--steel)" : undefined} />
         <Metric label="Expiring within 60 days" value={alerts.length} accent={alerts.length > 0 ? "var(--brick)" : undefined} />
+        <Metric label="HRB / Gateway relevant" value={hrbRelevantCount} accent={hrbRelevantCount > 0 ? "var(--steel)" : undefined} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 16 }}>
@@ -118,6 +125,31 @@ export default async function DashboardPage() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="card" style={{ padding: 16, marginTop: 16 }}>
+        <h3 style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 4 }}>Higher-risk building & Gateway priority list</h3>
+        <p style={{ fontSize: 12, color: "#5c6b78", marginBottom: 12 }}>
+          These are the people where competency evidence needs to hold up most — currently on an HRB, or with BSR Gateway experience. Verification for this group should get closest attention from line managers.
+        </p>
+        {hrbRelevantCount === 0 ? (
+          <div style={{ fontSize: 13, color: "#5c6b78" }}>No one has flagged HRB or Gateway experience yet.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {hrbStaff.map((p) => (
+              <div key={"hrb-" + p.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 9px", border: "1px solid var(--line)", borderRadius: 3, fontSize: 12.5 }}>
+                <span><strong>{p.full_name}</strong> <span style={{ color: "#5c6b78" }}>· {p.job_title}</span></span>
+                <span style={{ color: "var(--steel)", fontWeight: 600 }}>Currently on: {p.current_hrb_project || "HRB (project not named)"}</span>
+              </div>
+            ))}
+            {gatewayList.map((g, i) => (
+              <div key={"gw-" + i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 9px", border: "1px solid var(--line)", borderRadius: 3, fontSize: 12.5 }}>
+                <span><strong>{g.profiles?.full_name || "Unknown"}</strong></span>
+                <span style={{ color: "var(--steel)", fontWeight: 600 }}>{g.gateway_stage}: {g.project_name}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ padding: 16, marginTop: 16 }}>
