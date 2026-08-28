@@ -46,6 +46,24 @@ function TickGroup({ label, items, checkedIds, onToggle }) {
   );
 }
 
+function ChecklistItem({ done, label }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "6px 0" }}>
+      <span
+        style={{
+          width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+          background: done ? "var(--sage)" : "#E4E1D8",
+          color: "#fff", fontSize: 11, fontWeight: 700,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        {done ? "✓" : ""}
+      </span>
+      <span style={{ color: done ? "var(--ink)" : "#7a7666" }}>{label}</span>
+    </div>
+  );
+}
+
 export default function StaffForm({ userId, profile, lookups, categories, initialExperience, initialQuals, initialAssessments, initialClientExperience }) {
   const supabase = createClient();
   const [form, setForm] = useState({
@@ -59,6 +77,7 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
     cscs_expiry_date: profile?.cscs_expiry_date || "",
   });
   const [savedProfile, setSavedProfile] = useState(false);
+  const [tab, setTab] = useState("basic");
 
   const [experience, setExperience] = useState(initialExperience);
   const byCat = (cat) => experience.filter((e) => e.category === cat).map((e) => e.item_id);
@@ -77,6 +96,9 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
     )
   );
   const [savedCat, setSavedCat] = useState(null);
+
+  const [confirmedAt, setConfirmedAt] = useState(profile?.profile_confirmed_at || null);
+  const [confirming, setConfirming] = useState(false);
 
   async function saveProfile() {
     const payload = {
@@ -201,6 +223,24 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
     setTimeout(() => setSavedCat(null), 1500);
   }
 
+  async function confirmProfile() {
+    setConfirming(true);
+    const now = new Date().toISOString();
+    const { error } = await supabase.from("profiles").update({ profile_confirmed_at: now }).eq("id", userId);
+    setConfirming(false);
+    if (error) {
+      alert("Couldn't confirm: " + error.message);
+      return;
+    }
+    setConfirmedAt(now);
+  }
+
+  const basicComplete = Boolean(form.full_name && form.job_title && form.department);
+  const competencyRatedCount = Object.values(assessments).filter((a) => a.level > 0).length;
+  const formattedConfirmDate = confirmedAt
+    ? new Date(confirmedAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+    : null;
+
   return (
     <div style={{ maxWidth: 760 }}>
       <h2 style={{ fontSize: 19, fontWeight: 600, marginBottom: 2 }}>My profile</h2>
@@ -208,6 +248,35 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
         Keep this up to date — the bid team searches this data to staff tenders.
       </p>
 
+      <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: "1px solid var(--line)", flexWrap: "wrap" }}>
+        {[
+          ["basic", "Basic details"],
+          ["quals", "Qualifications"],
+          ["clients", "Clients"],
+          ["experience", "Project experience"],
+          ["competency", "Competencies"],
+          ["confirm", "Review & confirm"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            style={{
+              all: "unset",
+              cursor: "pointer",
+              padding: "8px 14px",
+              fontSize: 13,
+              fontWeight: 600,
+              color: tab === key ? "var(--ink)" : "#9b9787",
+              borderBottom: tab === key ? "2px solid var(--ink)" : "2px solid transparent",
+              marginBottom: -1,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "basic" && (
       <Section title="Basic details">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
           <div><span className="lbl">Full name</span><input className="fld" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
@@ -235,7 +304,9 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
         </div>
         <button className="btn primary" onClick={saveProfile}>{savedProfile ? "Saved" : "Save details"}</button>
       </Section>
+      )}
 
+      {tab === "quals" && (
       <Section title="Qualifications & training">
         <div style={{ marginBottom: 18, paddingBottom: 16, borderBottom: "1px solid var(--line)" }}>
           <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 8 }}>CSCS card</div>
@@ -340,10 +411,12 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
           <button className="btn" onClick={addQual}>Add qualification</button>
         </div>
       </Section>
+      )}
 
+      {tab === "clients" && (
       <Section title="Clients you've worked for">
         <p style={{ fontSize: 11.5, color: "#8a8676", marginTop: -6, marginBottom: 12 }}>
-          Pick a client, add the project name, and tick if it was a Durkan job — add as many as apply.
+          Pick a client, add the project name, and tick if it was a Durkan job — add as many as apply. No need to go back further than about the last 5 years unless it's particularly relevant.
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
           {clientExperience.map((c) => (
@@ -395,7 +468,9 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
         )}
         <button className="btn" onClick={addClientEntry}>Add client</button>
       </Section>
+      )}
 
+      {tab === "experience" && (
       <Section title="Project experience">
         <TickGroup label="Project types" items={lookups.projectTypes || []} checkedIds={byCat("project_type")} onToggle={(id) => toggleExperience("project_type", id)} />
         <TickGroup label="Project values" items={lookups.valueBands || []} checkedIds={byCat("value_band")} onToggle={(id) => toggleExperience("value_band", id)} />
@@ -436,7 +511,9 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
 
         <p style={{ fontSize: 11, color: "#8a8676", margin: "16px 0 0" }}>Ticks save immediately — no need to click save.</p>
       </Section>
+      )}
 
+      {tab === "competency" && (
       <Section title="Competency self-assessment">
         <p style={{ fontSize: 11.5, color: "#7a7666", marginTop: -6, marginBottom: 10 }}>
           Rate yourself honestly against each area below. A senior reviewer can verify or adjust these at any time — you don't need to submit anything separately.
@@ -497,6 +574,40 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
           );
         })}
       </Section>
+      )}
+
+      {tab === "confirm" && (
+      <Section title="Review & confirm">
+        <p style={{ fontSize: 13, color: "#7a7666", marginTop: -6, marginBottom: 16 }}>
+          A quick summary of what's on file, and a final step to confirm it's accurate and up to date.
+        </p>
+
+        <div style={{ background: "#F0EDE4", borderRadius: 4, padding: "10px 14px", marginBottom: 18 }}>
+          <ChecklistItem done={basicComplete} label="Basic details (name, job title, department) completed" />
+          <ChecklistItem done={quals.length > 0} label={`${quals.length} qualification${quals.length === 1 ? "" : "s"} added`} />
+          <ChecklistItem done={clientExperience.length > 0} label={`${clientExperience.length} client${clientExperience.length === 1 ? "" : "s"} added`} />
+          <ChecklistItem done={experience.length > 0} label={`${experience.length} project experience tick${experience.length === 1 ? "" : "s"} recorded`} />
+          <ChecklistItem done={competencyRatedCount === categories.length} label={`${competencyRatedCount} of ${categories.length} competency areas rated`} />
+        </div>
+
+        {formattedConfirmDate && (
+          <p style={{ fontSize: 12.5, color: "var(--sage)", fontWeight: 600, marginBottom: 12 }}>
+            Last confirmed on {formattedConfirmDate}.
+          </p>
+        )}
+
+        <p style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 14 }}>
+          By confirming, you're saying that everything in your profile — your details, qualifications,
+          clients, project experience and competency ratings — is accurate and up to date to the best
+          of your knowledge. You can still come back and edit anything later; just revisit this tab to
+          confirm again after making changes.
+        </p>
+
+        <button className="btn primary" onClick={confirmProfile} disabled={confirming}>
+          {confirming ? "Confirming..." : confirmedAt ? "Confirm again" : "Confirm my profile is up to date"}
+        </button>
+      </Section>
+      )}
     </div>
   );
 }
