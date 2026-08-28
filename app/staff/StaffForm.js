@@ -12,6 +12,14 @@ const LEVEL_DESCRIPTIONS = [
   "Often the person others turn to for this.",
   "Could teach or mentor others in this area.",
 ];
+const EVIDENCE_EXAMPLES = {
+  TDC: "e.g. 'Site Manager on the Kings Cross scheme, RC frame, 2022-24'",
+  BFS: "e.g. 'Led fire strategy coordination on a 12-storey HRB scheme, working directly with the fire engineer'",
+  BSA: "e.g. 'Acting Principal Designer duties on two Gateway 2 submissions in 2024'",
+  HSW: "e.g. 'Principal Contractor CDM duties on a live hospital refurb — zero RIDDOR incidents over 18 months'",
+  BEH: "e.g. 'Raised a design safety concern that changed the cladding spec on the Riverside scheme'",
+  MGT: "e.g. 'Line manage 4 site managers; review and sign off their competency assessments quarterly'",
+};
 
 function Section({ title, children }) {
   return (
@@ -383,7 +391,7 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
                 <textarea
                   className="fld"
                   rows={2}
-                  placeholder="e.g. a specific project, your role on it, and roughly when — 'Site Manager on the Kings Cross scheme, RC frame, 2022-24'"
+                  placeholder={EVIDENCE_EXAMPLES[c.id] || "e.g. a specific project, your role on it, and roughly when"}
                   disabled={a.status === "verified"}
                   value={a.evidence}
                   onChange={(e) => setAssessments({ ...assessments, [c.id]: { ...a, evidence: e.target.value } })}
