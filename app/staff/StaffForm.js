@@ -371,7 +371,7 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
                 </span>
               </div>
               <p style={{ fontSize: 12, color: "#7a7666", margin: "2px 0 8px" }}>{c.description}</p>
-              <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 10, marginBottom: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 10, marginBottom: 4 }}>
                 <select
                   className="fld"
                   disabled={a.status === "verified"}
@@ -380,14 +380,18 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
                 >
                   {LEVELS.map((l, i) => <option key={i} value={i}>{i} · {l}</option>)}
                 </select>
-                <input
+                <textarea
                   className="fld"
-                  placeholder="Evidence — projects, roles, examples"
+                  rows={2}
+                  placeholder="e.g. a specific project, your role on it, and roughly when — 'Site Manager on the Kings Cross scheme, RC frame, 2022-24'"
                   disabled={a.status === "verified"}
                   value={a.evidence}
                   onChange={(e) => setAssessments({ ...assessments, [c.id]: { ...a, evidence: e.target.value } })}
                 />
               </div>
+              <p style={{ fontSize: 11, color: "#9b9787", margin: "0 0 8px 190px" }}>
+                Name the project or situation and what you actually did — specifics help a reviewer trust the rating.
+              </p>
               {a.status !== "verified" && (
                 <button className="btn" onClick={() => saveAssessment(c.id)}>{savedCat === c.id ? "Saved" : "Save"}</button>
               )}
