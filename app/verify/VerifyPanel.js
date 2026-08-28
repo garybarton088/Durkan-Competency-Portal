@@ -3,31 +3,40 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+const LEVELS = ["Not assessed", "Awareness", "Developing", "Working", "Practitioner", "Expert"];
+
 export default function VerifyPanel({ initialPending }) {
   const supabase = createClient();
-  const [pending, setPending] = useState(initialPending);
+  const [pending, setPending] = useState(
+    initialPending.map((p) => ({ ...p, _level: p.level, _evidence: p.evidence }))
+  );
 
-  async function verify(id) {
+  function updateLocal(id, patch) {
+    setPending((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }
+
+  async function verify(item) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
     await supabase
       .from("competency_assessments")
-      .update({ status: "verified", verified_by: user.id, verified_at: new Date().toISOString() })
-      .eq("id", id);
-    setPending((prev) => prev.filter((p) => p.id !== id));
-  }
-
-  async function sendBack(id) {
-    await supabase.from("competency_assessments").update({ status: "self_assessed" }).eq("id", id);
-    setPending((prev) => prev.filter((p) => p.id !== id));
+      .update({
+        level: item._level,
+        evidence: item._evidence,
+        status: "verified",
+        verified_by: user.id,
+        verified_at: new Date().toISOString(),
+      })
+      .eq("id", item.id);
+    setPending((prev) => prev.filter((p) => p.id !== item.id));
   }
 
   return (
     <div style={{ maxWidth: 760 }}>
-      <h2 style={{ fontSize: 19, fontWeight: 600, marginBottom: 2 }}>Verify submissions</h2>
+      <h2 style={{ fontSize: 19, fontWeight: 600, marginBottom: 2 }}>Verify competencies</h2>
       <p style={{ fontSize: 13, color: "#7a7666", marginTop: 0, marginBottom: 16 }}>
-        {pending.length} entr{pending.length === 1 ? "y" : "ies"} waiting for sign-off.
+        {pending.length} self-assessed entr{pending.length === 1 ? "y" : "ies"} not yet verified. Adjust the level or evidence if needed, then verify.
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {pending.map((p) => (
@@ -39,13 +48,19 @@ export default function VerifyPanel({ initialPending }) {
               </div>
               <span className="mono" style={{ fontSize: 11, color: "#9b9787" }}>{p.category_id}</span>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>{p.competency_categories?.name}</div>
-            <div style={{ fontSize: 12.5, marginBottom: 4 }}>Self-rated level: <strong>{p.level}</strong> / 5</div>
-            <div style={{ fontSize: 12.5, color: "#7a7666", marginBottom: 10 }}>{p.evidence || "No evidence notes provided."}</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn primary" onClick={() => verify(p.id)}>Verify</button>
-              <button className="btn" onClick={() => sendBack(p.id)}>Send back to staff</button>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{p.competency_categories?.name}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 10, marginBottom: 10 }}>
+              <select className="fld" value={p._level} onChange={(e) => updateLocal(p.id, { _level: Number(e.target.value) })}>
+                {LEVELS.map((l, i) => <option key={i} value={i}>{i} · {l}</option>)}
+              </select>
+              <input
+                className="fld"
+                value={p._evidence || ""}
+                placeholder="No evidence notes provided."
+                onChange={(e) => updateLocal(p.id, { _evidence: e.target.value })}
+              />
             </div>
+            <button className="btn primary" onClick={() => verify(p)}>Verify</button>
           </div>
         ))}
         {pending.length === 0 && (
