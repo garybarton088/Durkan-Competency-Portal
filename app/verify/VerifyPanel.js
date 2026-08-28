@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 
 const LEVELS = ["Not assessed", "Just starting", "Getting there", "Solid & dependable", "Very strong", "Expert"];
 
-export default function VerifyPanel({ initialPending }) {
+export default function VerifyPanel({ initialPending, isSenior }) {
   const supabase = createClient();
   const [pending, setPending] = useState(
     initialPending.map((p) => ({ ...p, _level: p.level, _evidence: p.evidence }))
@@ -36,7 +36,9 @@ export default function VerifyPanel({ initialPending }) {
     <div style={{ maxWidth: 760 }}>
       <h2 style={{ fontSize: 19, fontWeight: 600, marginBottom: 2 }}>Verify competencies</h2>
       <p style={{ fontSize: 13, color: "#5c6b78", marginTop: 0, marginBottom: 16 }}>
-        {pending.length} self-assessed entr{pending.length === 1 ? "y" : "ies"} not yet verified. Adjust the level or evidence if needed, then verify.
+        {isSenior
+          ? `Showing every self-assessed entry company-wide (senior oversight). ${pending.length} not yet verified.`
+          : `Showing entries for your direct reports. ${pending.length} not yet verified. Adjust the level or evidence if needed, then verify.`}
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {pending.map((p) => (
@@ -65,7 +67,9 @@ export default function VerifyPanel({ initialPending }) {
         ))}
         {pending.length === 0 && (
           <div className="card" style={{ padding: 24, textAlign: "center", color: "#8a97a1", fontSize: 13 }}>
-            Nothing waiting for review.
+            {isSenior
+              ? "Nothing waiting for review."
+              : "You have no direct reports with entries awaiting verification — or nobody has you set as their line manager yet."}
           </div>
         )}
       </div>
