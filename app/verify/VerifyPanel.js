@@ -35,7 +35,7 @@ export default function VerifyPanel({ initialPending }) {
   return (
     <div style={{ maxWidth: 760 }}>
       <h2 style={{ fontSize: 19, fontWeight: 600, marginBottom: 2 }}>Verify competencies</h2>
-      <p style={{ fontSize: 13, color: "#7a7666", marginTop: 0, marginBottom: 16 }}>
+      <p style={{ fontSize: 13, color: "#5c6b78", marginTop: 0, marginBottom: 16 }}>
         {pending.length} self-assessed entr{pending.length === 1 ? "y" : "ies"} not yet verified. Adjust the level or evidence if needed, then verify.
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -44,9 +44,9 @@ export default function VerifyPanel({ initialPending }) {
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
               <div>
                 <strong style={{ fontSize: 13.5 }}>{p.profiles?.full_name}</strong>
-                <span style={{ color: "#7a7666", fontSize: 12 }}> · {p.profiles?.job_title}</span>
+                <span style={{ color: "#5c6b78", fontSize: 12 }}> · {p.profiles?.job_title}</span>
               </div>
-              <span className="mono" style={{ fontSize: 11, color: "#9b9787" }}>{p.category_id}</span>
+              <span className="mono" style={{ fontSize: 11, color: "#8a97a1" }}>{p.category_id}</span>
             </div>
             <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{p.competency_categories?.name}</div>
             <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 10, marginBottom: 10 }}>
@@ -64,7 +64,7 @@ export default function VerifyPanel({ initialPending }) {
           </div>
         ))}
         {pending.length === 0 && (
-          <div className="card" style={{ padding: 24, textAlign: "center", color: "#9b9787", fontSize: 13 }}>
+          <div className="card" style={{ padding: 24, textAlign: "center", color: "#8a97a1", fontSize: 13 }}>
             Nothing waiting for review.
           </div>
         )}
