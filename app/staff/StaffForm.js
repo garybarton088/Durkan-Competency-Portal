@@ -64,7 +64,7 @@ function ChecklistItem({ done, label }) {
   );
 }
 
-export default function StaffForm({ userId, profile, lookups, categories, initialExperience, initialQuals, initialAssessments, initialClientExperience }) {
+export default function StaffForm({ userId, profile, lookups, categories, initialExperience, initialQuals, initialAssessments, initialClientExperience, allStaff, initialGatewayExperience }) {
   const supabase = createClient();
   const [form, setForm] = useState({
     full_name: profile?.full_name || "",
@@ -72,6 +72,7 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
     department: profile?.department || "",
     business_division: profile?.business_division || "",
     start_date: profile?.start_date ? profile.start_date.slice(0, 7) : "",
+    line_manager_id: profile?.line_manager_id || "",
     cscs_card_type: profile?.cscs_card_type || "",
     cscs_card_number: profile?.cscs_card_number || "",
     cscs_expiry_date: profile?.cscs_expiry_date || "",
@@ -85,6 +86,14 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
   const [quals, setQuals] = useState(initialQuals);
   const [clientExperience, setClientExperience] = useState(initialClientExperience || []);
   const [newClientEntry, setNewClientEntry] = useState({ client_id: "", other_client_name: "", project_name: "", is_durkan_job: true });
+  const [hrbForm, setHrbForm] = useState({
+    currently_on_hrb: profile?.currently_on_hrb || false,
+    current_hrb_project: profile?.current_hrb_project || "",
+    current_hrb_outline: profile?.current_hrb_outline || "",
+  });
+  const [savedHrb, setSavedHrb] = useState(false);
+  const [gatewayExperience, setGatewayExperience] = useState(initialGatewayExperience || []);
+  const [newGatewayEntry, setNewGatewayEntry] = useState({ project_name: "", gateway_stage: "Gateway 2", outline: "" });
   const [newQual, setNewQual] = useState({ name: "", awarding_body: "", date_obtained: "", expiry_date: "", certificate_ref: "", qual_type: "academic", has_expiry: false });
 
   const [assessments, setAssessments] = useState(
@@ -111,6 +120,7 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
       ...form,
       start_date: form.start_date ? `${form.start_date}-01` : null,
       cscs_expiry_date: form.cscs_expiry_date ? form.cscs_expiry_date : null,
+      line_manager_id: form.line_manager_id || null,
     };
     const { error } = await supabase.from("profiles").update(payload).eq("id", userId);
     if (error) {
@@ -209,6 +219,43 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
     return c ? c.name : "Unknown client";
   }
 
+  async function saveHrb() {
+    const payload = {
+      currently_on_hrb: hrbForm.currently_on_hrb,
+      current_hrb_project: hrbForm.currently_on_hrb ? hrbForm.current_hrb_project : "",
+      current_hrb_outline: hrbForm.currently_on_hrb ? hrbForm.current_hrb_outline : "",
+    };
+    const { error } = await supabase.from("profiles").update(payload).eq("id", userId);
+    if (error) {
+      alert("Couldn't save: " + error.message);
+      return;
+    }
+    setSavedHrb(true);
+    setTimeout(() => setSavedHrb(false), 1500);
+  }
+
+  async function addGatewayEntry() {
+    if (!newGatewayEntry.project_name.trim()) return;
+    const { data, error } = await supabase
+      .from("gateway_experience")
+      .insert({ staff_id: userId, ...newGatewayEntry })
+      .select()
+      .single();
+    if (error) {
+      alert("Couldn't add: " + error.message);
+      return;
+    }
+    if (data) {
+      setGatewayExperience((prev) => [data, ...prev]);
+      setNewGatewayEntry({ project_name: "", gateway_stage: "Gateway 2", outline: "" });
+    }
+  }
+
+  async function removeGatewayEntry(id) {
+    await supabase.from("gateway_experience").delete().eq("id", id);
+    setGatewayExperience((prev) => prev.filter((g) => g.id !== id));
+  }
+
   async function saveAssessment(catId) {
     const current = assessments[catId];
     const payload = {
@@ -264,6 +311,7 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
           ["clients", "Clients"],
           ["experience", "Project experience"],
           ["competency", "Competencies"],
+          ["hrb", "HRB & Gateway"],
           ["confirm", "Review & confirm"],
         ].map(([key, label]) => (
           <button
@@ -309,6 +357,15 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
             <div className="fld" style={{ background: "#EAF2EF", color: "#5c6b78", display: "flex", alignItems: "center" }}>
               {lengthOfService(form.start_date) || "—"}
             </div>
+          </div>
+          <div>
+            <span className="lbl">Line manager</span>
+            <select className="fld" value={form.line_manager_id} onChange={(e) => setForm({ ...form, line_manager_id: e.target.value })}>
+              <option value="">Select...</option>
+              {(allStaff || []).filter((s) => s.id !== userId).map((s) => (
+                <option key={s.id} value={s.id}>{s.full_name || "Unnamed"}</option>
+              ))}
+            </select>
           </div>
         </div>
         <button className="btn primary" onClick={saveProfile}>{savedProfile ? "Saved" : "Save details"}</button>
@@ -606,6 +663,83 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
             </div>
           );
         })}
+      </Section>
+      )}
+
+      {tab === "hrb" && (
+      <Section title="Higher-risk buildings & Gateway experience">
+        <p style={{ fontSize: 12.5, color: "#5c6b78", marginTop: -6, marginBottom: 16, lineHeight: 1.5 }}>
+          This is used to prioritise Building Safety Act compliance checks — the people working on
+          higher-risk buildings, or who've taken a project through a BSR Gateway, are where our
+          legal exposure is highest, so this is what your line manager will look at most closely
+          when reviewing your competency ratings.
+        </p>
+
+        <div style={{ marginBottom: 20, paddingBottom: 18, borderBottom: "1px solid var(--line)" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
+            <input
+              type="checkbox"
+              checked={hrbForm.currently_on_hrb}
+              onChange={(e) => setHrbForm({ ...hrbForm, currently_on_hrb: e.target.checked })}
+            />
+            I am currently working on a higher-risk building
+          </label>
+          {hrbForm.currently_on_hrb && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10, marginBottom: 10 }}>
+              <div>
+                <span className="lbl">Project name</span>
+                <input className="fld" value={hrbForm.current_hrb_project} onChange={(e) => setHrbForm({ ...hrbForm, current_hrb_project: e.target.value })} />
+              </div>
+              <div>
+                <span className="lbl">Your role / the works involved</span>
+                <input
+                  className="fld"
+                  placeholder="e.g. Site Manager overseeing façade remediation on an 18-storey residential tower"
+                  value={hrbForm.current_hrb_outline}
+                  onChange={(e) => setHrbForm({ ...hrbForm, current_hrb_outline: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+          <button className="btn" onClick={saveHrb}>{savedHrb ? "Saved" : "Save"}</button>
+        </div>
+
+        <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 2 }}>BSR Gateway experience</div>
+        <p style={{ fontSize: 11, color: "#6b7a86", marginBottom: 10 }}>
+          Any projects where you've taken a scheme through Gateway 2 (design) and/or Gateway 3
+          (completion) with the Building Safety Regulator.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+          {gatewayExperience.map((g) => (
+            <div key={g.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 3, fontSize: 12.5 }}>
+              <div>
+                <strong>{g.project_name}</strong>
+                <span style={{ color: "var(--steel)", fontWeight: 600 }}> · {g.gateway_stage}</span>
+                {g.outline && <div style={{ color: "#5c6b78", marginTop: 2 }}>{g.outline}</div>}
+              </div>
+              <button className="btn danger" onClick={() => removeGatewayEntry(g.id)}>Remove</button>
+            </div>
+          ))}
+          {gatewayExperience.length === 0 && <div style={{ fontSize: 12.5, color: "#8a97a1" }}>No Gateway experience added yet.</div>}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 8, marginBottom: 8 }}>
+          <input className="fld" placeholder="Project name" value={newGatewayEntry.project_name} onChange={(e) => setNewGatewayEntry({ ...newGatewayEntry, project_name: e.target.value })} />
+          <select className="fld" value={newGatewayEntry.gateway_stage} onChange={(e) => setNewGatewayEntry({ ...newGatewayEntry, gateway_stage: e.target.value })}>
+            <option>Gateway 2</option>
+            <option>Gateway 3</option>
+            <option>Gateway 2 & 3</option>
+          </select>
+        </div>
+        <textarea
+          className="fld"
+          rows={2}
+          placeholder="Brief outline of the works and your role — e.g. 'Principal Contractor's Gateway 3 submission for a 14-storey residential block, coordinating the golden thread handover'"
+          style={{ marginBottom: 8 }}
+          value={newGatewayEntry.outline}
+          onChange={(e) => setNewGatewayEntry({ ...newGatewayEntry, outline: e.target.value })}
+        />
+        <button className="btn" onClick={addGatewayEntry}>Add Gateway experience</button>
       </Section>
       )}
 
