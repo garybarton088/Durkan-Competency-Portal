@@ -9,7 +9,7 @@ export default async function StaffPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: lookups }, { data: categories }, { data: myExperience }, { data: myQuals }, { data: myAssessments }, { data: myClientExperience }] =
+  const [{ data: profile }, { data: lookups }, { data: categories }, { data: myExperience }, { data: myQuals }, { data: myAssessments }, { data: myClientExperience }, { data: allStaff }, { data: myGatewayExperience }] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", user.id).single(),
       supabase.rpc("get_all_lookups"),
@@ -18,6 +18,8 @@ export default async function StaffPage() {
       supabase.from("qualifications").select("*").eq("staff_id", user.id).order("date_obtained", { ascending: false }),
       supabase.from("competency_assessments").select("*").eq("staff_id", user.id),
       supabase.from("client_experience").select("*").eq("staff_id", user.id).order("created_at", { ascending: false }),
+      supabase.from("profiles").select("id, full_name").order("full_name"),
+      supabase.from("gateway_experience").select("*").eq("staff_id", user.id).order("created_at", { ascending: false }),
     ]);
 
   return (
@@ -30,6 +32,8 @@ export default async function StaffPage() {
       initialQuals={myQuals || []}
       initialAssessments={myAssessments || []}
       initialClientExperience={myClientExperience || []}
+      allStaff={allStaff || []}
+      initialGatewayExperience={myGatewayExperience || []}
     />
   );
 }
