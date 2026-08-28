@@ -62,7 +62,7 @@ export default async function RootLayout({ children }) {
             >
               <div style={{ padding: "0 6px" }}>
                 <img
-                  src={profile?.business_division === "Regen" ? "/durkan-regen-logo.jpg" : "/durkan-logo.png"}
+                  src="/durkan-regen-logo.jpg"
                   alt="Durkan"
                   style={{ height: 22, marginBottom: 6 }}
                 />
