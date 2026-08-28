@@ -72,6 +72,7 @@ export default async function RootLayout({ children }) {
                 </div>
               </div>
               <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <a className="navbtn" href="/">Welcome</a>
                 <a className="navbtn" href="/staff">My profile</a>
                 {profile?.role === "senior" && (
                   <a className="navbtn" href="/verify">Verify competencies</a>
