@@ -33,9 +33,10 @@ export default function Home() {
       </div>
 
       <p style={{ fontSize: 13.5, color: "#7a7666", lineHeight: 1.6, marginBottom: 20 }}>
-        It should only take a few minutes to fill in properly, and you can come back and update it
-        any time your experience changes. A senior reviewer may adjust or verify your competency
-        ratings, but everything else is entirely in your hands.
+        Filling it in properly takes more like 15–20 minutes the first time, given how much it
+        covers — but you don't have to do it all in one sitting, and it's much quicker to keep
+        up to date after that. A senior reviewer may adjust or verify your competency ratings,
+        but everything else is entirely in your hands.
       </p>
 
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
