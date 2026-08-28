@@ -85,7 +85,7 @@ export default function SearchPanel({ staff, experience, lookups, categories }) 
   return (
     <div>
       <h2 style={{ fontSize: 19, fontWeight: 600, marginBottom: 2 }}>Tender search</h2>
-      <p style={{ fontSize: 13, color: "#7a7666", marginTop: 0, marginBottom: 16 }}>
+      <p style={{ fontSize: 13, color: "#5c6b78", marginTop: 0, marginBottom: 16 }}>
         Filter staff by experience and verified competency to build a tender shortlist.
       </p>
 
@@ -125,7 +125,7 @@ export default function SearchPanel({ staff, experience, lookups, categories }) 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 8 }}>
             {categories.map((c) => (
               <div key={c.id}>
-                <label style={{ fontSize: 11, color: "#7a7666" }}>{c.id}</label>
+                <label style={{ fontSize: 11, color: "#5c6b78" }}>{c.id}</label>
                 <select className="fld" value={minLevels[c.id] || 0} onChange={(e) => setMinLevels({ ...minLevels, [c.id]: e.target.value })}>
                   <option value={0}>Any</option>
                   {LEVELS.slice(1).map((l, i) => <option key={i + 1} value={i + 1}>{i + 1}+ {l}</option>)}
@@ -141,7 +141,7 @@ export default function SearchPanel({ staff, experience, lookups, categories }) 
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={{ fontSize: 12.5, color: "#7a7666" }}>{results.length} matching staff</div>
+        <div style={{ fontSize: 12.5, color: "#5c6b78" }}>{results.length} matching staff</div>
         {shortlist.length > 0 && (
           <button className="btn" onClick={copyList}>{copied ? "Copied" : `Copy shortlist (${shortlist.length})`}</button>
         )}
@@ -153,7 +153,7 @@ export default function SearchPanel({ staff, experience, lookups, categories }) 
             <input type="checkbox" checked={shortlist.includes(s.id)} onChange={() => toggleShort(s.id)} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600 }}>{s.full_name}</div>
-              <div style={{ fontSize: 11.5, color: "#7a7666" }}>{s.job_title} · {s.business_division}</div>
+              <div style={{ fontSize: 11.5, color: "#5c6b78" }}>{s.job_title} · {s.business_division}</div>
             </div>
             <div style={{ display: "flex", gap: 4 }}>
               {categories.map((c) => {
@@ -166,7 +166,7 @@ export default function SearchPanel({ staff, experience, lookups, categories }) 
                     title={`${c.id}: ${LEVELS[comp?.level || 0]}${verified ? " (verified)" : ""}`}
                     style={{
                       width: 22, height: 22, borderRadius: 3, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center",
-                      background: verified ? "var(--steel)" : "#cfcabb", color: "#fff",
+                      background: verified ? "var(--steel)" : "#c3ccd2", color: "#fff",
                     }}
                   >
                     {comp?.level || 0}
@@ -177,7 +177,7 @@ export default function SearchPanel({ staff, experience, lookups, categories }) 
           </div>
         ))}
         {results.length === 0 && (
-          <div className="card" style={{ padding: 20, textAlign: "center", fontSize: 13, color: "#9b9787" }}>
+          <div className="card" style={{ padding: 20, textAlign: "center", fontSize: 13, color: "#8a97a1" }}>
             No staff match these filters yet.
           </div>
         )}
