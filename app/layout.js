@@ -78,6 +78,9 @@ export default async function RootLayout({ children }) {
                   <a className="navbtn" href="/verify">Verify competencies</a>
                 )}
                 {(profile?.role === "senior" || profile?.role === "bid_team") && (
+                  <a className="navbtn" href="/dashboard">Coverage & compliance</a>
+                )}
+                {(profile?.role === "senior" || profile?.role === "bid_team") && (
                   <a className="navbtn" href="/search">Tender search</a>
                 )}
               </nav>
