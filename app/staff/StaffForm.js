@@ -188,10 +188,23 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
       <Section title="Qualifications & training">
         <div style={{ marginBottom: 18, paddingBottom: 16, borderBottom: "1px solid var(--line)" }}>
           <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 8 }}>CSCS card</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: form.cscs_card_type && form.cscs_card_type !== "None / Expired" ? "1.5fr 1fr 1fr" : "1.5fr", gap: 8 }}>
             <div>
               <span className="lbl">Card type</span>
-              <select className="fld" value={form.cscs_card_type} onChange={(e) => setForm({ ...form, cscs_card_type: e.target.value })}>
+              <select
+                className="fld"
+                value={form.cscs_card_type}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const clearing = value === "None / Expired" || value === "";
+                  setForm({
+                    ...form,
+                    cscs_card_type: value,
+                    cscs_card_number: clearing ? "" : form.cscs_card_number,
+                    cscs_expiry_date: clearing ? "" : form.cscs_expiry_date,
+                  });
+                }}
+              >
                 <option value="">Select...</option>
                 <option>None / Expired</option>
                 <option>Labourer (Green)</option>
@@ -205,14 +218,18 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
                 <option>Provisional / Trainee (Red)</option>
               </select>
             </div>
-            <div>
-              <span className="lbl">Card number</span>
-              <input className="fld" value={form.cscs_card_number} onChange={(e) => setForm({ ...form, cscs_card_number: e.target.value })} />
-            </div>
-            <div>
-              <span className="lbl">Expiry date</span>
-              <input className="fld" type="date" value={form.cscs_expiry_date} onChange={(e) => setForm({ ...form, cscs_expiry_date: e.target.value })} />
-            </div>
+            {form.cscs_card_type && form.cscs_card_type !== "None / Expired" && (
+              <>
+                <div>
+                  <span className="lbl">Card number</span>
+                  <input className="fld" value={form.cscs_card_number} onChange={(e) => setForm({ ...form, cscs_card_number: e.target.value })} />
+                </div>
+                <div>
+                  <span className="lbl">Expiry date</span>
+                  <input className="fld" type="date" value={form.cscs_expiry_date} onChange={(e) => setForm({ ...form, cscs_expiry_date: e.target.value })} />
+                </div>
+              </>
+            )}
           </div>
           <button className="btn" style={{ marginTop: 8 }} onClick={saveProfile}>{savedProfile ? "Saved" : "Save CSCS details"}</button>
         </div>
