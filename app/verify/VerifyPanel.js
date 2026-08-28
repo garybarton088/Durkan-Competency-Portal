@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-const LEVELS = ["Not assessed", "Awareness", "Developing", "Working", "Practitioner", "Expert"];
+const LEVELS = ["Not assessed", "Just starting", "Getting there", "Solid & dependable", "Very strong", "Expert"];
 
 export default function VerifyPanel({ initialPending }) {
   const supabase = createClient();
