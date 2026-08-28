@@ -67,7 +67,7 @@ export default async function RootLayout({ children }) {
                   style={{ height: 22, marginBottom: 6 }}
                 />
                 <h1 style={{ fontSize: 16.5, fontWeight: 600, lineHeight: 1.25, marginTop: 2 }}>Competency register</h1>
-                <div style={{ fontSize: 10.5, color: "#8a8676", marginTop: 3 }}>
+                <div style={{ fontSize: 10.5, color: "#6b7a86", marginTop: 3 }}>
                   {profile?.full_name} · {profile?.role}
                 </div>
               </div>
