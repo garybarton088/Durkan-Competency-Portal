@@ -10,7 +10,7 @@ export async function signIn(formData) {
     password: formData.get("password"),
   });
   if (error) redirect(`/login?error=${encodeURIComponent(error.message)}`);
-  redirect("/staff");
+  redirect("/");
 }
 
 export async function signUp(formData) {
