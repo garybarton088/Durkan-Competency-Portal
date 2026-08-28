@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 
 const LEVELS = ["Not assessed", "Just starting", "Getting there", "Solid & dependable", "Very strong", "Expert"];
 
-export default function VerifyPanel({ initialPending, isSenior }) {
+export default function VerifyPanel({ initialPending, isSenior, ownPendingCount }) {
   const supabase = createClient();
   const [pending, setPending] = useState(
     initialPending.map((p) => ({ ...p, _level: p.level, _evidence: p.evidence }))
@@ -37,9 +37,14 @@ export default function VerifyPanel({ initialPending, isSenior }) {
       <h2 style={{ fontSize: 19, fontWeight: 600, marginBottom: 2 }}>Verify competencies</h2>
       <p style={{ fontSize: 13, color: "#5c6b78", marginTop: 0, marginBottom: 16 }}>
         {isSenior
-          ? `Showing every self-assessed entry company-wide (senior oversight). ${pending.length} not yet verified.`
+          ? `Showing every self-assessed entry company-wide (senior oversight), excluding your own — those need a colleague with senior access to review. ${pending.length} not yet verified.`
           : `Showing entries for your direct reports. ${pending.length} not yet verified. Adjust the level or evidence if needed, then verify.`}
       </p>
+      {isSenior && ownPendingCount > 0 && (
+        <div style={{ background: "#FFF8EC", border: "1px solid #C77D0A", borderRadius: 4, padding: "8px 12px", marginBottom: 16, fontSize: 12.5, color: "#8a5a06" }}>
+          You have {ownPendingCount} of your own competency rating{ownPendingCount === 1 ? "" : "s"} awaiting verification — you can't verify your own, so ask another senior colleague to review them here.
+        </div>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {pending.map((p) => (
           <div key={p.id} className="card" style={{ padding: 14 }}>
