@@ -248,7 +248,7 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
         Keep this up to date — the bid team searches this data to staff tenders.
       </p>
 
-      <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: "1px solid var(--line)", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap", background: "#F0EDE4", padding: 6, borderRadius: 6 }}>
         {[
           ["basic", "Basic details"],
           ["quals", "Qualifications"],
@@ -263,12 +263,12 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
             style={{
               all: "unset",
               cursor: "pointer",
-              padding: "8px 14px",
-              fontSize: 13,
-              fontWeight: 600,
-              color: tab === key ? "var(--ink)" : "#9b9787",
-              borderBottom: tab === key ? "2px solid var(--ink)" : "2px solid transparent",
-              marginBottom: -1,
+              padding: "9px 16px",
+              fontSize: 13.5,
+              fontWeight: 700,
+              borderRadius: 4,
+              color: tab === key ? "#fff" : "var(--ink)",
+              background: tab === key ? "var(--ink)" : "transparent",
             }}
           >
             {label}
@@ -472,6 +472,13 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
 
       {tab === "experience" && (
       <Section title="Project experience">
+        <p style={{ fontSize: 12.5, color: "#7a7666", marginTop: -6, marginBottom: 16, lineHeight: 1.5 }}>
+          This is where you record the breadth of your practical experience — the sectors, build
+          types, contracts and specialisms you've actually worked with. Only tick something if
+          you've genuinely delivered it yourself, not just observed it or worked alongside someone
+          who did. This is what the bid team searches against, so accuracy here matters more than
+          ticking as many boxes as possible.
+        </p>
         <TickGroup label="Project types" items={lookups.projectTypes || []} checkedIds={byCat("project_type")} onToggle={(id) => toggleExperience("project_type", id)} />
         <TickGroup label="Project values" items={lookups.valueBands || []} checkedIds={byCat("value_band")} onToggle={(id) => toggleExperience("value_band", id)} />
         <TickGroup label="Build types" items={lookups.buildTypes || []} checkedIds={byCat("build_type")} onToggle={(id) => toggleExperience("build_type", id)} />
