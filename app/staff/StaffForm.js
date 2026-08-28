@@ -46,7 +46,7 @@ function TickGroup({ label, items, checkedIds, onToggle }) {
   );
 }
 
-export default function StaffForm({ userId, profile, lookups, categories, initialExperience, initialQuals, initialAssessments }) {
+export default function StaffForm({ userId, profile, lookups, categories, initialExperience, initialQuals, initialAssessments, initialClientExperience }) {
   const supabase = createClient();
   const [form, setForm] = useState({
     full_name: profile?.full_name || "",
@@ -64,6 +64,8 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
   const byCat = (cat) => experience.filter((e) => e.category === cat).map((e) => e.item_id);
 
   const [quals, setQuals] = useState(initialQuals);
+  const [clientExperience, setClientExperience] = useState(initialClientExperience || []);
+  const [newClientEntry, setNewClientEntry] = useState({ client_id: "", other_client_name: "", project_name: "", is_durkan_job: true });
   const [newQual, setNewQual] = useState({ name: "", awarding_body: "", date_obtained: "", expiry_date: "", certificate_ref: "", qual_type: "academic", has_expiry: false });
 
   const [assessments, setAssessments] = useState(
@@ -144,6 +146,39 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
   async function removeQual(id) {
     await supabase.from("qualifications").delete().eq("id", id);
     setQuals((prev) => prev.filter((q) => q.id !== id));
+  }
+
+  async function addClientEntry() {
+    const isOther = newClientEntry.client_id === "other";
+    if (isOther && !newClientEntry.other_client_name.trim()) return;
+    if (!isOther && !newClientEntry.client_id) return;
+    const payload = {
+      staff_id: userId,
+      client_id: isOther ? null : Number(newClientEntry.client_id),
+      other_client_name: isOther ? newClientEntry.other_client_name.trim() : "",
+      project_name: newClientEntry.project_name,
+      is_durkan_job: newClientEntry.is_durkan_job,
+    };
+    const { data, error } = await supabase.from("client_experience").insert(payload).select().single();
+    if (error) {
+      alert("Couldn't add: " + error.message);
+      return;
+    }
+    if (data) {
+      setClientExperience((prev) => [data, ...prev]);
+      setNewClientEntry({ client_id: "", other_client_name: "", project_name: "", is_durkan_job: true });
+    }
+  }
+
+  async function removeClientEntry(id) {
+    await supabase.from("client_experience").delete().eq("id", id);
+    setClientExperience((prev) => prev.filter((c) => c.id !== id));
+  }
+
+  function clientName(entry) {
+    if (entry.other_client_name) return entry.other_client_name;
+    const c = (lookups.clients || []).find((x) => x.id === entry.client_id);
+    return c ? c.name : "Unknown client";
   }
 
   async function saveAssessment(catId) {
@@ -304,6 +339,61 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
           )}
           <button className="btn" onClick={addQual}>Add qualification</button>
         </div>
+      </Section>
+
+      <Section title="Clients you've worked for">
+        <p style={{ fontSize: 11.5, color: "#8a8676", marginTop: -6, marginBottom: 12 }}>
+          Pick a client, add the project name, and tick if it was a Durkan job — add as many as apply.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+          {clientExperience.map((c) => (
+            <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 3, fontSize: 12.5 }}>
+              <div>
+                <strong>{clientName(c)}</strong>
+                {c.project_name && <span style={{ color: "#7a7666" }}> · {c.project_name}</span>}
+                {c.is_durkan_job && <span style={{ color: "var(--steel)", fontWeight: 600 }}> · Durkan job</span>}
+              </div>
+              <button className="btn danger" onClick={() => removeClientEntry(c.id)}>Remove</button>
+            </div>
+          ))}
+          {clientExperience.length === 0 && <div style={{ fontSize: 12.5, color: "#9b9787" }}>No clients added yet.</div>}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1.3fr 1fr", gap: 8, marginBottom: 8 }}>
+          <select
+            className="fld"
+            value={newClientEntry.client_id}
+            onChange={(e) => setNewClientEntry({ ...newClientEntry, client_id: e.target.value })}
+          >
+            <option value="">Select a client...</option>
+            <optgroup label="Housing associations">
+              {(lookups.clients || []).filter((c) => c.category === "housing_association").map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </optgroup>
+            <optgroup label="London local authorities">
+              {(lookups.clients || []).filter((c) => c.category === "local_authority").map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </optgroup>
+            <option value="other">Other (please specify)</option>
+          </select>
+          <input className="fld" placeholder="Project name" value={newClientEntry.project_name} onChange={(e) => setNewClientEntry({ ...newClientEntry, project_name: e.target.value })} />
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
+            <input type="checkbox" checked={newClientEntry.is_durkan_job} onChange={(e) => setNewClientEntry({ ...newClientEntry, is_durkan_job: e.target.checked })} />
+            Durkan job
+          </label>
+        </div>
+        {newClientEntry.client_id === "other" && (
+          <input
+            className="fld"
+            placeholder="Client name"
+            style={{ marginBottom: 8 }}
+            value={newClientEntry.other_client_name}
+            onChange={(e) => setNewClientEntry({ ...newClientEntry, other_client_name: e.target.value })}
+          />
+        )}
+        <button className="btn" onClick={addClientEntry}>Add client</button>
       </Section>
 
       <Section title="Project experience">
