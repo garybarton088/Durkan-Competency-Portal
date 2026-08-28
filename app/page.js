@@ -38,6 +38,22 @@ export default function Home() {
         ratings, but everything else is entirely in your hands.
       </p>
 
+      <div className="card" style={{ padding: 16, marginBottom: 20 }}>
+        <h3 style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 12 }}>What to do</h3>
+        <p style={{ fontSize: 13, color: "#7a7666", marginBottom: 12 }}>
+          Your profile is split into six tabs — work through them in order, or jump straight to
+          whichever needs updating:
+        </p>
+        <ol style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8 }}>
+          <li style={{ fontSize: 13.5, lineHeight: 1.5 }}><strong>Basic details</strong> — your name, job title, department, division and start date.</li>
+          <li style={{ fontSize: 13.5, lineHeight: 1.5 }}><strong>Qualifications</strong> — your CSCS card, and any academic, training or CPD qualifications.</li>
+          <li style={{ fontSize: 13.5, lineHeight: 1.5 }}><strong>Clients</strong> — housing associations, local authorities or other clients you've worked with, and the projects involved.</li>
+          <li style={{ fontSize: 13.5, lineHeight: 1.5 }}><strong>Project experience</strong> — tick everything relevant: sectors, build types, contract forms, sustainability, and more.</li>
+          <li style={{ fontSize: 13.5, lineHeight: 1.5 }}><strong>Competencies</strong> — rate yourself honestly across six areas, with a real example for each.</li>
+          <li style={{ fontSize: 13.5, lineHeight: 1.5 }}><strong>Review & confirm</strong> — check everything's complete, then confirm your profile is accurate and up to date.</li>
+        </ol>
+      </div>
+
       <a href="/staff" className="btn primary" style={{ textDecoration: "none", display: "inline-flex" }}>
         Go to my profile
       </a>
