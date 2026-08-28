@@ -52,14 +52,14 @@ function ChecklistItem({ done, label }) {
       <span
         style={{
           width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
-          background: done ? "var(--sage)" : "#E4E1D8",
+          background: done ? "var(--sage)" : "#E1E5E8",
           color: "#fff", fontSize: 11, fontWeight: 700,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}
       >
         {done ? "✓" : ""}
       </span>
-      <span style={{ color: done ? "var(--ink)" : "#7a7666" }}>{label}</span>
+      <span style={{ color: done ? "var(--ink)" : "#5c6b78" }}>{label}</span>
     </div>
   );
 }
@@ -244,11 +244,11 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
   return (
     <div style={{ maxWidth: 760 }}>
       <h2 style={{ fontSize: 19, fontWeight: 600, marginBottom: 2 }}>My profile</h2>
-      <p style={{ fontSize: 13, color: "#7a7666", marginTop: 0, marginBottom: 18 }}>
+      <p style={{ fontSize: 13, color: "#5c6b78", marginTop: 0, marginBottom: 18 }}>
         Keep this up to date — the bid team searches this data to staff tenders.
       </p>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap", background: "#F0EDE4", padding: 6, borderRadius: 6 }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap", background: "#EAF2EF", padding: 6, borderRadius: 6 }}>
         {[
           ["basic", "Basic details"],
           ["quals", "Qualifications"],
@@ -297,7 +297,7 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
           </div>
           <div>
             <span className="lbl">Length of service</span>
-            <div className="fld" style={{ background: "#F0EDE4", color: "#7A7666", display: "flex", alignItems: "center" }}>
+            <div className="fld" style={{ background: "#EAF2EF", color: "#5c6b78", display: "flex", alignItems: "center" }}>
               {lengthOfService(form.start_date) || "—"}
             </div>
           </div>
@@ -365,18 +365,18 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
           return (
             <div key={group.key} style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 2 }}>{group.label}</div>
-              <div style={{ fontSize: 11, color: "#8a8676", marginBottom: 8 }}>{group.hint}</div>
+              <div style={{ fontSize: 11, color: "#6b7a86", marginBottom: 8 }}>{group.hint}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
                 {groupQuals.map((q) => (
                   <div key={q.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 3, fontSize: 12.5 }}>
                     <div>
                       <strong>{q.name}</strong>
-                      <span style={{ color: "#7a7666" }}> · {q.awarding_body} {q.expiry_date ? `· expires ${q.expiry_date}` : ""}</span>
+                      <span style={{ color: "#5c6b78" }}> · {q.awarding_body} {q.expiry_date ? `· expires ${q.expiry_date}` : ""}</span>
                     </div>
                     <button className="btn danger" onClick={() => removeQual(q.id)}>Remove</button>
                   </div>
                 ))}
-                {groupQuals.length === 0 && <div style={{ fontSize: 12, color: "#9b9787" }}>None added yet.</div>}
+                {groupQuals.length === 0 && <div style={{ fontSize: 12, color: "#8a97a1" }}>None added yet.</div>}
               </div>
             </div>
           );
@@ -415,7 +415,7 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
 
       {tab === "clients" && (
       <Section title="Clients you've worked for">
-        <p style={{ fontSize: 11.5, color: "#8a8676", marginTop: -6, marginBottom: 12 }}>
+        <p style={{ fontSize: 11.5, color: "#6b7a86", marginTop: -6, marginBottom: 12 }}>
           Pick a client, add the project name, and tick if it was a Durkan job — add as many as apply. No need to go back further than about the last 5 years unless it's particularly relevant.
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
@@ -423,13 +423,13 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
             <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 3, fontSize: 12.5 }}>
               <div>
                 <strong>{clientName(c)}</strong>
-                {c.project_name && <span style={{ color: "#7a7666" }}> · {c.project_name}</span>}
+                {c.project_name && <span style={{ color: "#5c6b78" }}> · {c.project_name}</span>}
                 {c.is_durkan_job && <span style={{ color: "var(--steel)", fontWeight: 600 }}> · Durkan job</span>}
               </div>
               <button className="btn danger" onClick={() => removeClientEntry(c.id)}>Remove</button>
             </div>
           ))}
-          {clientExperience.length === 0 && <div style={{ fontSize: 12.5, color: "#9b9787" }}>No clients added yet.</div>}
+          {clientExperience.length === 0 && <div style={{ fontSize: 12.5, color: "#8a97a1" }}>No clients added yet.</div>}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1.3fr 1fr", gap: 8, marginBottom: 8 }}>
@@ -472,7 +472,7 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
 
       {tab === "experience" && (
       <Section title="Project experience">
-        <p style={{ fontSize: 12.5, color: "#7a7666", marginTop: -6, marginBottom: 16, lineHeight: 1.5 }}>
+        <p style={{ fontSize: 12.5, color: "#5c6b78", marginTop: -6, marginBottom: 16, lineHeight: 1.5 }}>
           This is where you record the breadth of your practical experience — the sectors, build
           types, contracts and specialisms you've actually worked with. Only tick something if
           you've genuinely delivered it yourself, not just observed it or worked alongside someone
@@ -516,22 +516,22 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
         <TickGroup label="Constraints / third parties" items={lookups.constraintTypes || []} checkedIds={byCat("constraint_type")} onToggle={(id) => toggleExperience("constraint_type", id)} />
         <TickGroup label="Warranty & design accreditation" items={lookups.accreditationTypes || []} checkedIds={byCat("accreditation_type")} onToggle={(id) => toggleExperience("accreditation_type", id)} />
 
-        <p style={{ fontSize: 11, color: "#8a8676", margin: "16px 0 0" }}>Ticks save immediately — no need to click save.</p>
+        <p style={{ fontSize: 11, color: "#6b7a86", margin: "16px 0 0" }}>Ticks save immediately — no need to click save.</p>
       </Section>
       )}
 
       {tab === "competency" && (
       <Section title="Competency self-assessment">
-        <p style={{ fontSize: 11.5, color: "#7a7666", marginTop: -6, marginBottom: 10 }}>
+        <p style={{ fontSize: 11.5, color: "#5c6b78", marginTop: -6, marginBottom: 10 }}>
           Rate yourself honestly against each area below. A senior reviewer can verify or adjust these at any time — you don't need to submit anything separately.
         </p>
-        <div style={{ background: "#F0EDE4", borderRadius: 4, padding: "10px 12px", marginBottom: 16 }}>
+        <div style={{ background: "#EAF2EF", borderRadius: 4, padding: "10px 12px", marginBottom: 16 }}>
           <div className="lbl" style={{ marginBottom: 8 }}>What the scores mean</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             {LEVELS.map((l, i) => (
               <div key={i} style={{ fontSize: 12, display: "flex", gap: 8 }}>
                 <strong style={{ minWidth: 130, flexShrink: 0 }}>{i} · {l}</strong>
-                <span style={{ color: "#7a7666" }}>{LEVEL_DESCRIPTIONS[i]}</span>
+                <span style={{ color: "#5c6b78" }}>{LEVEL_DESCRIPTIONS[i]}</span>
               </div>
             ))}
           </div>
@@ -546,13 +546,13 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
                   style={{
                     fontSize: 11,
                     fontWeight: 600,
-                    color: a.status === "verified" ? "var(--sage)" : "#9b9787",
+                    color: a.status === "verified" ? "var(--sage)" : "#8a97a1",
                   }}
                 >
                   {a.status === "verified" ? "Verified" : "Not yet verified"}
                 </span>
               </div>
-              <p style={{ fontSize: 12, color: "#7a7666", margin: "2px 0 8px" }}>{c.description}</p>
+              <p style={{ fontSize: 12, color: "#5c6b78", margin: "2px 0 8px" }}>{c.description}</p>
               <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 10, marginBottom: 4 }}>
                 <select
                   className="fld"
@@ -571,7 +571,7 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
                   onChange={(e) => setAssessments({ ...assessments, [c.id]: { ...a, evidence: e.target.value } })}
                 />
               </div>
-              <p style={{ fontSize: 11, color: "#9b9787", margin: "0 0 8px 190px" }}>
+              <p style={{ fontSize: 11, color: "#8a97a1", margin: "0 0 8px 190px" }}>
                 Name the project or situation and what you actually did — specifics help a reviewer trust the rating.
               </p>
               {a.status !== "verified" && (
@@ -585,11 +585,11 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
 
       {tab === "confirm" && (
       <Section title="Review & confirm">
-        <p style={{ fontSize: 13, color: "#7a7666", marginTop: -6, marginBottom: 16 }}>
+        <p style={{ fontSize: 13, color: "#5c6b78", marginTop: -6, marginBottom: 16 }}>
           A quick summary of what's on file, and a final step to confirm it's accurate and up to date.
         </p>
 
-        <div style={{ background: "#F0EDE4", borderRadius: 4, padding: "10px 14px", marginBottom: 18 }}>
+        <div style={{ background: "#EAF2EF", borderRadius: 4, padding: "10px 14px", marginBottom: 18 }}>
           <ChecklistItem done={basicComplete} label="Basic details (name, job title, department) completed" />
           <ChecklistItem done={quals.length > 0} label={`${quals.length} qualification${quals.length === 1 ? "" : "s"} added`} />
           <ChecklistItem done={clientExperience.length > 0} label={`${clientExperience.length} client${clientExperience.length === 1 ? "" : "s"} added`} />
