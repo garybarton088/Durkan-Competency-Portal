@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-const LEVELS = ["Not assessed", "Awareness", "Developing", "Working", "Practitioner", "Expert"];
+const LEVELS = ["Not assessed", "Just starting", "Getting there", "Solid & dependable", "Very strong", "Expert"];
 
 function FilterGroup({ label, items, selectedIds, onToggle }) {
   return (
