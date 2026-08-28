@@ -193,6 +193,7 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
               <span className="lbl">Card type</span>
               <select className="fld" value={form.cscs_card_type} onChange={(e) => setForm({ ...form, cscs_card_type: e.target.value })}>
                 <option value="">Select...</option>
+                <option>None / Expired</option>
                 <option>Labourer (Green)</option>
                 <option>Experienced Worker (Red)</option>
                 <option>Skilled Worker (Blue)</option>
