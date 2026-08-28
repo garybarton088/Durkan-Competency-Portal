@@ -16,8 +16,10 @@ export default async function VerifyPage() {
 
   const isSenior = myProfile?.role === "senior";
   const pending = isSenior
-    ? allPending || []
+    ? (allPending || []).filter((p) => p.staff_id !== user.id)
     : (allPending || []).filter((p) => p.profiles?.line_manager_id === user.id);
 
-  return <VerifyPanel initialPending={pending} isSenior={isSenior} />;
+  const ownPendingCount = (allPending || []).filter((p) => p.staff_id === user.id).length;
+
+  return <VerifyPanel initialPending={pending} isSenior={isSenior} ownPendingCount={ownPendingCount} />;
 }
