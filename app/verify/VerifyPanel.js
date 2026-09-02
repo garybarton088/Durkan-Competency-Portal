@@ -50,7 +50,7 @@ export default function VerifyPanel({ initialPending, isSenior, ownPendingCount 
           <div key={p.id} className="card" style={{ padding: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
               <div>
-                <strong style={{ fontSize: 13.5 }}>{p.profiles?.full_name}</strong>
+                <a href={`/report/${p.staff_id}`} style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)", textDecoration: "none" }}>{p.profiles?.full_name} →</a>
                 <span style={{ color: "#5c6b78", fontSize: 12 }}> · {p.profiles?.job_title}</span>
               </div>
               <span className="mono" style={{ fontSize: 11, color: "#8a97a1" }}>{p.category_id}</span>

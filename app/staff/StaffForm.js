@@ -770,9 +770,12 @@ export default function StaffForm({ userId, profile, lookups, categories, initia
           confirm again after making changes.
         </p>
 
-        <button className="btn primary" onClick={confirmProfile} disabled={confirming}>
-          {confirming ? "Confirming..." : confirmedAt ? "Confirm again" : "Confirm my profile is up to date"}
-        </button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <button className="btn primary" onClick={confirmProfile} disabled={confirming}>
+            {confirming ? "Confirming..." : confirmedAt ? "Confirm again" : "Confirm my profile is up to date"}
+          </button>
+          <a href={`/report/${userId}`} className="btn" style={{ textDecoration: "none" }}>View my full report</a>
+        </div>
       </Section>
       )}
     </div>

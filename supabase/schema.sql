@@ -3,6 +3,17 @@
 -- everything: tables, seed data, permissions, and the lookup function.
 
 -- ============================================================
+-- 0. BASE PRIVILEGES
+-- Supabase normally sets these up automatically on a new project.
+-- Included here so this script is safe to run even after a full
+-- "drop schema public cascade" reset.
+-- ============================================================
+grant usage on schema public to anon, authenticated, service_role;
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+alter default privileges in schema public grant all on routines to anon, authenticated, service_role;
+
+-- ============================================================
 -- 1. PROFILES
 -- ============================================================
 create table if not exists profiles (
@@ -16,6 +27,11 @@ create table if not exists profiles (
   cscs_card_type text,
   cscs_card_number text,
   cscs_expiry_date date,
+  profile_confirmed_at timestamptz,
+  line_manager_id uuid references profiles(id),
+  currently_on_hrb boolean not null default false,
+  current_hrb_project text default '',
+  current_hrb_outline text default '',
   bsa_relevant boolean not null default false,
   created_at timestamptz not null default now()
 );
@@ -53,6 +69,13 @@ create table if not exists accreditation_types (id serial primary key, name text
 create table if not exists material_types (id serial primary key, name text unique not null, sort_order int not null default 0);
 create table if not exists sustainability_types (id serial primary key, name text unique not null, sort_order int not null default 0);
 create table if not exists mmc_types (id serial primary key, name text unique not null, sort_order int not null default 0);
+
+create table if not exists clients (
+  id serial primary key,
+  name text unique not null,
+  category text not null check (category in ('housing_association', 'local_authority')),
+  sort_order int not null default 0
+);
 
 insert into project_types (name, sort_order) values
   ('Residential', 1), ('Education', 2), ('Healthcare', 3), ('Commercial / offices', 4),
@@ -134,6 +157,69 @@ insert into mmc_types (name, sort_order) values
   ('SIPS', 1), ('Bathroom pods', 2), ('Thin joint', 3), ('Utility pods', 4), ('Pre-fab plant rooms', 5)
 on conflict (name) do nothing;
 
+insert into clients (name, category, sort_order) values
+  ('L&Q (London & Quadrant)', 'housing_association', 1),
+  ('Peabody', 'housing_association', 2),
+  ('Southern Housing', 'housing_association', 3),
+  ('Clarion Housing Group', 'housing_association', 4),
+  ('Notting Hill Genesis', 'housing_association', 5),
+  ('Metropolitan Thames Valley (MTVH)', 'housing_association', 6),
+  ('Sovereign Network Group', 'housing_association', 7),
+  ('Hyde Group', 'housing_association', 8),
+  ('A2Dominion', 'housing_association', 9),
+  ('Network Homes', 'housing_association', 10),
+  ('Riverside Group', 'housing_association', 11),
+  ('Guinness Partnership', 'housing_association', 12),
+  ('Home Group', 'housing_association', 13),
+  ('Orbit Group', 'housing_association', 14),
+  ('Paragon Asra Housing', 'housing_association', 15),
+  ('Places for People', 'housing_association', 16),
+  ('Sanctuary Housing', 'housing_association', 17),
+  ('Origin Housing', 'housing_association', 18),
+  ('Moat Homes', 'housing_association', 19),
+  ('Vivid Homes', 'housing_association', 20),
+  ('Radian', 'housing_association', 21),
+  ('Abri Group', 'housing_association', 22),
+  ('Watford Community Housing', 'housing_association', 23),
+  ('Grand Union Housing Group', 'housing_association', 24)
+on conflict (name) do nothing;
+
+insert into clients (name, category, sort_order) values
+  ('Barking and Dagenham', 'local_authority', 1),
+  ('Barnet', 'local_authority', 2),
+  ('Bexley', 'local_authority', 3),
+  ('Brent', 'local_authority', 4),
+  ('Bromley', 'local_authority', 5),
+  ('Camden', 'local_authority', 6),
+  ('City of London', 'local_authority', 7),
+  ('Croydon', 'local_authority', 8),
+  ('Ealing', 'local_authority', 9),
+  ('Enfield', 'local_authority', 10),
+  ('Greenwich', 'local_authority', 11),
+  ('Hackney', 'local_authority', 12),
+  ('Hammersmith and Fulham', 'local_authority', 13),
+  ('Haringey', 'local_authority', 14),
+  ('Harrow', 'local_authority', 15),
+  ('Havering', 'local_authority', 16),
+  ('Hillingdon', 'local_authority', 17),
+  ('Hounslow', 'local_authority', 18),
+  ('Islington', 'local_authority', 19),
+  ('Kensington and Chelsea', 'local_authority', 20),
+  ('Kingston upon Thames', 'local_authority', 21),
+  ('Lambeth', 'local_authority', 22),
+  ('Lewisham', 'local_authority', 23),
+  ('Merton', 'local_authority', 24),
+  ('Newham', 'local_authority', 25),
+  ('Redbridge', 'local_authority', 26),
+  ('Richmond upon Thames', 'local_authority', 27),
+  ('Southwark', 'local_authority', 28),
+  ('Sutton', 'local_authority', 29),
+  ('Tower Hamlets', 'local_authority', 30),
+  ('Waltham Forest', 'local_authority', 31),
+  ('Wandsworth', 'local_authority', 32),
+  ('Westminster', 'local_authority', 33)
+on conflict (name) do nothing;
+
 -- ============================================================
 -- 3. STAFF EXPERIENCE (tick-box records) & QUALIFICATIONS
 -- ============================================================
@@ -162,6 +248,25 @@ create table if not exists qualifications (
   created_at timestamptz not null default now()
 );
 
+create table if not exists client_experience (
+  id uuid primary key default gen_random_uuid(),
+  staff_id uuid not null references profiles(id) on delete cascade,
+  client_id int references clients(id),
+  other_client_name text default '',
+  project_name text not null default '',
+  is_durkan_job boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists gateway_experience (
+  id uuid primary key default gen_random_uuid(),
+  staff_id uuid not null references profiles(id) on delete cascade,
+  project_name text not null default '',
+  gateway_stage text not null default 'Gateway 2' check (gateway_stage in ('Gateway 2', 'Gateway 3', 'Gateway 2 & 3')),
+  outline text default '',
+  created_at timestamptz not null default now()
+);
+
 -- ============================================================
 -- 4. BSA COMPETENCY CATEGORIES & ASSESSMENTS
 -- ============================================================
@@ -173,12 +278,12 @@ create table if not exists competency_categories (
 );
 
 insert into competency_categories (id, name, description, sort_order) values
-  ('TDC', 'Technical & discipline competence', 'Role-specific technical knowledge and demonstrable experience.', 1),
-  ('BFS', 'Building & fire safety', 'Fire strategy, structural safety and building physics for higher-risk buildings.', 2),
-  ('BSA', 'Legal & regulatory (Building Safety Act)', 'Working knowledge of BSA 2022, the Gateway process and Golden Thread duties.', 3),
-  ('HSW', 'Health & safety', 'CDM 2015 duties, site safety leadership and risk management.', 4),
-  ('BEH', 'Behavioural & ethical', 'Communication, collaboration, raising concerns, professional conduct.', 5),
-  ('MGT', 'Management & assurance', 'Oversight and assurance of competence within teams (duty-holder roles).', 6)
+  ('TDC', 'Technical & discipline competence', 'Your practical, hands-on expertise in your own discipline — the day-to-day craft of your role, whether that''s running a site, coordinating a design, or controlling costs.', 1),
+  ('BFS', 'Building & fire safety', 'Your understanding of how buildings stay safe once built and occupied — fire strategy, structural integrity, and how a building physically behaves — with particular weight on higher-risk buildings (tall or complex schemes).', 2),
+  ('BSA', 'Legal & regulatory (Building Safety Act)', 'Your practical knowledge of the Building Safety Act 2022 — what it requires at each Gateway checkpoint, and how to keep the paper trail (the Golden Thread) that shows a building was designed and built safely.', 3),
+  ('HSW', 'Health & safety', 'Your role in keeping people safe — whether that''s day-to-day site safety, CDM 2015 duties, or making sure the work you plan, design or oversee is delivered without unnecessary risk.', 4),
+  ('BEH', 'Behavioural & ethical', 'How you work with others — communicating clearly, collaborating well, and feeling able to speak up if something looks wrong.', 5),
+  ('MGT', 'Management & assurance', 'If you manage a team: how you make sure the people under you are genuinely competent for what they''re doing, and step in if they''re not. Mainly relevant to Principal Contractor/Designer-type duty holders.', 6)
 on conflict (id) do nothing;
 
 create table if not exists competency_assessments (
@@ -219,6 +324,9 @@ alter table accreditation_types enable row level security;
 alter table material_types enable row level security;
 alter table sustainability_types enable row level security;
 alter table mmc_types enable row level security;
+alter table clients enable row level security;
+alter table client_experience enable row level security;
+alter table gateway_experience enable row level security;
 alter table competency_categories enable row level security;
 
 drop policy if exists "lookups readable by all logged in users" on project_types;
@@ -253,6 +361,7 @@ drop policy if exists "lookups readable by all logged in users" on sustainabilit
 create policy "lookups readable by all logged in users" on sustainability_types for select using (auth.role() = 'authenticated');
 drop policy if exists "lookups readable by all logged in users" on mmc_types;
 create policy "lookups readable by all logged in users" on mmc_types for select using (auth.role() = 'authenticated');
+create policy "lookups readable by all logged in users" on clients for select using (auth.role() = 'authenticated');
 drop policy if exists "categories readable by all logged in users" on competency_categories;
 create policy "categories readable by all logged in users" on competency_categories for select using (auth.role() = 'authenticated');
 
@@ -260,6 +369,11 @@ drop policy if exists "profiles readable by all logged in users" on profiles;
 create policy "profiles readable by all logged in users" on profiles for select using (auth.role() = 'authenticated');
 drop policy if exists "users update own profile" on profiles;
 create policy "users update own profile" on profiles for update using (id = auth.uid()) with check (id = auth.uid());
+
+drop policy if exists "senior can update any profile" on profiles;
+create policy "senior can update any profile" on profiles for update
+  using (exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'senior'))
+  with check (exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'senior'));
 
 drop policy if exists "read all experience" on staff_experience;
 create policy "read all experience" on staff_experience for select using (auth.role() = 'authenticated');
@@ -276,6 +390,22 @@ drop policy if exists "update own qualifications" on qualifications;
 create policy "update own qualifications" on qualifications for update using (staff_id = auth.uid()) with check (staff_id = auth.uid());
 drop policy if exists "delete own qualifications" on qualifications;
 create policy "delete own qualifications" on qualifications for delete using (staff_id = auth.uid());
+
+drop policy if exists "read all client experience" on client_experience;
+create policy "read all client experience" on client_experience for select using (auth.role() = 'authenticated');
+drop policy if exists "manage own client experience" on client_experience;
+create policy "manage own client experience" on client_experience for insert with check (staff_id = auth.uid());
+drop policy if exists "update own client experience" on client_experience;
+create policy "update own client experience" on client_experience for update using (staff_id = auth.uid()) with check (staff_id = auth.uid());
+drop policy if exists "delete own client experience" on client_experience;
+create policy "delete own client experience" on client_experience for delete using (staff_id = auth.uid());
+
+drop policy if exists "read all gateway experience" on gateway_experience;
+create policy "read all gateway experience" on gateway_experience for select using (auth.role() = 'authenticated');
+drop policy if exists "manage own gateway experience" on gateway_experience;
+create policy "manage own gateway experience" on gateway_experience for insert with check (staff_id = auth.uid());
+drop policy if exists "delete own gateway experience" on gateway_experience;
+create policy "delete own gateway experience" on gateway_experience for delete using (staff_id = auth.uid());
 
 drop policy if exists "read all assessments" on competency_assessments;
 create policy "read all assessments" on competency_assessments for select using (auth.role() = 'authenticated');
@@ -294,6 +424,11 @@ create policy "senior can verify any assessment" on competency_assessments for u
   using (exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'senior'))
   with check (exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'senior'));
 
+drop policy if exists "manager can verify direct reports" on competency_assessments;
+create policy "manager can verify direct reports" on competency_assessments for update
+  using (exists (select 1 from profiles p where p.id = competency_assessments.staff_id and p.line_manager_id = auth.uid()))
+  with check (exists (select 1 from profiles p where p.id = competency_assessments.staff_id and p.line_manager_id = auth.uid()));
+
 -- ============================================================
 -- 6. SEARCH VIEW (for the bid team's Tender Search page)
 -- ============================================================
@@ -305,6 +440,7 @@ select
   p.business_division,
   p.department,
   p.bsa_relevant,
+  p.profile_confirmed_at,
   coalesce(
     jsonb_object_agg(ca.category_id, jsonb_build_object('level', ca.level, 'status', ca.status))
       filter (where ca.category_id is not null),
@@ -338,8 +474,16 @@ as $$
     'accreditationTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from accreditation_types t),
     'materialTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from material_types t),
     'sustainabilityTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from sustainability_types t),
-    'mmcTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from mmc_types t)
+    'mmcTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from mmc_types t),
+    'clients', (select coalesce(json_agg(row_to_json(t) order by t.category, t.sort_order), '[]') from clients t)
   );
 $$;
 
 grant execute on function get_all_lookups() to authenticated;
+
+-- ============================================================
+-- 8. TABLE-LEVEL GRANTS (must come after tables exist)
+-- ============================================================
+grant all on all tables in schema public to anon, authenticated, service_role;
+grant all on all sequences in schema public to anon, authenticated, service_role;
+grant all on all routines in schema public to anon, authenticated, service_role;

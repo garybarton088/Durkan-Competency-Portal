@@ -152,7 +152,7 @@ export default function SearchPanel({ staff, experience, lookups, categories }) 
           <div key={s.id} className="card" style={{ padding: "10px 12px", display: "flex", alignItems: "center", gap: 10 }}>
             <input type="checkbox" checked={shortlist.includes(s.id)} onChange={() => toggleShort(s.id)} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600 }}>{s.full_name}</div>
+              <a href={`/report/${s.id}`} style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)", textDecoration: "none" }}>{s.full_name} →</a>
               <div style={{ fontSize: 11.5, color: "#5c6b78" }}>{s.job_title} · {s.business_division}</div>
             </div>
             <div style={{ display: "flex", gap: 4 }}>
