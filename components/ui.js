@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePortal } from './PortalProvider';
 import { SCALE } from '@/lib/constants';
+import { configProblem } from '@/lib/supabase/client';
 
 export function Field({ label, children, hint }) {
   return (
@@ -166,8 +167,8 @@ export function Guard({ children, allow }) {
 export function ConfigMissing() {
   return (
     <div className="notice err">
-      The portal isn&apos;t connected to its database. In Vercel, add the environment variables
-      <b> NEXT_PUBLIC_SUPABASE_URL</b> and <b>NEXT_PUBLIC_SUPABASE_ANON_KEY</b>, then redeploy.
+      The portal isn&apos;t connected to its database. {configProblem} Check the environment variables
+      <b> NEXT_PUBLIC_SUPABASE_URL</b> and <b>NEXT_PUBLIC_SUPABASE_ANON_KEY</b> in Vercel, then redeploy.
     </div>
   );
 }
