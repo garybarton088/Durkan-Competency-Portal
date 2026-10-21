@@ -70,7 +70,7 @@ function Welcome() {
 
       <div className="notice" style={{ marginTop: 24 }}>
         Your information is visible only to you, your line manager, senior reviewers and the bid team. You can view or print your
-        own report at any time.
+        own report at any time. The <Link href="/privacy">privacy notice</Link> explains how it&apos;s used and kept.
       </div>
     </>
   );

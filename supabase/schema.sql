@@ -69,7 +69,6 @@ create table public.qualifications (
   grade          text,
   year_obtained  int,
   expiry_date    date,
-  reference      text,
   created_at     timestamptz not null default now()
 );
 

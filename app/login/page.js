@@ -110,6 +110,12 @@ export default function LoginPage() {
             {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Send link'}
           </button>
         </form>
+        {mode === 'signup' && (
+          <p className="small muted" style={{ marginTop: 12, textAlign: 'center' }}>
+            Before you create an account, please read the <a href="/privacy" target="_blank" rel="noreferrer">privacy notice</a>.
+            It explains what&apos;s recorded, who can see it and how long it&apos;s kept.
+          </p>
+        )}
         {msg && <div className={'notice ' + (msg.type === 'err' ? 'err' : '')} style={{ marginTop: 14 }}>{msg.text}</div>}
         <div className="row small" style={{ justifyContent: 'center', marginTop: 16, gap: 16 }}>
           {mode !== 'signin' && <button className="linkbtn" onClick={() => setMode('signin')}>Sign in</button>}

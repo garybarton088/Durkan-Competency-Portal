@@ -141,3 +141,5 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 
 .review-grid { grid-template-columns: minmax(220px, 300px) 1fr; align-items: start; }
 @media (max-width: 800px) { .review-grid { grid-template-columns: 1fr; } }
+
+.site-footer { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); }

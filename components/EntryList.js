@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { usePortal } from './PortalProvider';
 import { Field, Select, Chips, ClientPicker } from './ui';
 
+const SENSITIVE_HINT = "Work details only. Please don't include health or other sensitive personal information about yourself or anyone else.";
+
 /*
   Generic add / edit / delete list for the person's own entries.
   fields: [{ name, label, type: text|number|date|textarea|select|multi|checkbox|client, list, required, full, hint }]
@@ -109,7 +111,7 @@ export default function EntryList({ table, fields, title, meta, orderBy = 'creat
                 </label>
               ) : (
                 <div key={f.name} style={{ gridColumn: f.full || f.type === 'multi' || f.type === 'textarea' ? '1 / -1' : undefined }}>
-                  <Field label={f.label + (f.required ? ' *' : '')} hint={f.hint}>
+                  <Field label={f.label + (f.required ? ' *' : '')} hint={f.hint || (f.type === 'textarea' ? SENSITIVE_HINT : undefined)}>
                     {input(f)}
                   </Field>
                 </div>

@@ -157,7 +157,7 @@ function BasicDetails({ onSaved }) {
         <Field label="Date joined Durkan"><input type="date" value={f.start_date || ''} onChange={(e) => set('start_date', e.target.value)} /></Field>
         <Field label="Years in the industry"><input type="number" min="0" value={f.years_in_industry} onChange={(e) => set('years_in_industry', e.target.value)} /></Field>
         <div style={{ gridColumn: '1 / -1' }}>
-          <Field label="Professional summary" hint="Two or three sentences the bid team could drop into a CV.">
+          <Field label="Professional summary" hint="Two or three sentences the bid team could drop into a CV. Work details only.">
             <textarea value={f.summary} onChange={(e) => set('summary', e.target.value)} />
           </Field>
         </div>
@@ -212,8 +212,7 @@ function Qualifications({ onChange }) {
           { name: 'body', label: 'Awarding or professional body', type: 'select', list: 'professional_body' },
           { name: 'grade', label: 'Grade / level', placeholder: 'e.g. 2:1, Chartered, Level 6' },
           { name: 'year_obtained', label: 'Year obtained', type: 'number' },
-          { name: 'expiry_date', label: 'Expiry date (if any)', type: 'date' },
-          { name: 'reference', label: 'Membership or card number' }
+          { name: 'expiry_date', label: 'Expiry date (if any)', type: 'date' }
         ]}
         title={(r) => r.title}
         meta={(r) => [
@@ -368,7 +367,7 @@ function CompetencyCard({ cat, row, onSaved }) {
       <p className="small muted">{cat.description}</p>
       <ScalePicker value={rating} onChange={setRating} />
       <div style={{ marginTop: 12 }}>
-        <Field label="Your evidence">
+        <Field label="Your evidence" hint="Work details only. Please don't include health or other sensitive personal information about yourself or anyone else.">
           <textarea
             value={evidence}
             onChange={(e) => setEvidence(e.target.value)}
