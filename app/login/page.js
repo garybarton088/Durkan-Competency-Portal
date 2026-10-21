@@ -44,6 +44,7 @@ export default function LoginPage() {
         router.refresh();
       } else if (mode === 'signup') {
         if (!name.trim()) throw new Error('Please enter your full name.');
+        if (!/@durkan\.co\.uk$/i.test(email.trim())) throw new Error('Please use your Durkan email address (ending @durkan.co.uk).');
         if (password.length < 8) throw new Error('Use a password of at least 8 characters.');
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
@@ -64,7 +65,10 @@ export default function LoginPage() {
         setMsg({ type: 'ok', text: 'If that email has an account, a sign-in link is on its way.' });
       }
     } catch (err) {
-      setMsg({ type: 'err', text: err.message || 'Something went wrong.' });
+      const text = /database error saving new user/i.test(err.message || '')
+        ? 'Please use your Durkan email address (ending @durkan.co.uk).'
+        : err.message || 'Something went wrong.';
+      setMsg({ type: 'err', text });
     }
     setBusy(false);
   }
@@ -76,7 +80,7 @@ export default function LoginPage() {
         <h1 style={{ textAlign: 'center', fontSize: 22 }}>Competency Portal</h1>
         <p className="muted small" style={{ textAlign: 'center' }}>
           {mode === 'signin' && 'Sign in with your work email.'}
-          {mode === 'signup' && 'Create your account with your work email.'}
+          {mode === 'signup' && 'Create your account with your Durkan email address.'}
           {mode === 'reset' && "We'll email you a link to sign in and set a new password."}
         </p>
         <form onSubmit={submit} className="stack">

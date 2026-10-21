@@ -10,6 +10,7 @@
 -- 0. Wipe
 -- ---------------------------------------------------------------------
 drop trigger if exists on_auth_user_created on auth.users;
+drop trigger if exists enforce_email_domain on auth.users;
 drop schema if exists public cascade;
 create schema public;
 
@@ -191,6 +192,26 @@ end $$;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- Only Durkan email addresses can register (allowed domains listed in allowed_email)
+create or replace function public.allowed_email(addr text) returns boolean
+language sql immutable as $$
+  select lower(split_part(coalesce(addr, ''), '@', 2)) = any (array['durkan.co.uk'])
+$$;
+
+create or replace function public.enforce_email_domain() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.allowed_email(new.email) then
+    raise exception 'Only Durkan email addresses (@durkan.co.uk) can register for the competency portal';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists enforce_email_domain on auth.users;
+create trigger enforce_email_domain
+  before insert or update of email on auth.users
+  for each row execute function public.enforce_email_domain();
 
 -- Staff can't promote themselves. Role changes only via the table editor / SQL editor.
 create or replace function public.protect_profile() returns trigger
