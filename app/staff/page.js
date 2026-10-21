@@ -340,7 +340,7 @@ function CompetencyCard({ cat, row, onSaved }) {
   const [rating, setRating] = useState(row?.self_rating ?? 0);
   const [evidence, setEvidence] = useState(row?.self_evidence || '');
   const [state, setState] = useState(null);
-  const dirty = rating !== (row?.self_rating ?? 0) || evidence !== (row?.self_evidence || '');
+  const dirty = rating !== (row?.self_rating ?? 0) || evidence.trim() !== (row?.self_evidence || '');
 
   async function save() {
     setState('saving');
@@ -348,6 +348,7 @@ function CompetencyCard({ cat, row, onSaved }) {
       .from('competency_assessments')
       .upsert({ staff_id: user.id, category_id: cat.id, self_rating: rating, self_evidence: evidence.trim() || null }, { onConflict: 'staff_id,category_id' });
     if (error) return setState(error.message);
+    setEvidence(evidence.trim());
     setState('saved');
     onSaved();
   }
@@ -384,7 +385,7 @@ function CompetencyCard({ cat, row, onSaved }) {
         <button className="btn small" onClick={save} disabled={!dirty || state === 'saving'}>
           {state === 'saving' ? 'Saving…' : 'Save'}
         </button>
-        {state === 'saved' && !dirty && <span className="tag teal">Saved</span>}
+        {state === 'saved' && !dirty && <span className="tag teal">Saved ✓</span>}
         {state && !['saving', 'saved'].includes(state) && <span className="notice err">{state}</span>}
       </div>
     </div>
