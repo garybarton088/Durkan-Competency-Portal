@@ -1,43 +1,43 @@
-import { createServerClient } from "@supabase/ssr";
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
+import { makeServerClient } from '@/lib/supabase/server';
+
+const PUBLIC_PATHS = ['/login', '/auth'];
 
 export async function middleware(request) {
-  let response = NextResponse.next({ request: { headers: request.headers } });
+  let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        get(name) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name, value, options) {
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name, options) {
-          response.cookies.set({ name, value: "", ...options });
-        },
-      },
+  const supabase = makeServerClient({
+    getAll() {
+      return request.cookies.getAll();
+    },
+    setAll(cookiesToSet) {
+      cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+      response = NextResponse.next({ request });
+      cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
     }
-  );
+  });
+
+  // Env vars missing: let pages load so they can show a clear setup message.
+  if (!supabase) return response;
 
   const {
-    data: { user },
+    data: { user }
   } = await supabase.auth.getUser();
 
-  const isLoginPage = request.nextUrl.pathname.startsWith("/login");
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/auth/");
+  const path = request.nextUrl.pathname;
+  const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + '/'));
 
-  if (!user && !isLoginPage && !isAuthRoute) {
+  if (!user && !isPublic) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = '/login';
+    url.search = '';
     return NextResponse.redirect(url);
   }
 
-  if (user && isLoginPage) {
+  if (user && path === '/login') {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = '/';
+    url.search = '';
     return NextResponse.redirect(url);
   }
 
@@ -45,5 +45,6 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
+  // Skip Next internals and any URL with a file extension (logos, favicon, etc.)
+  matcher: ['/((?!_next/static|_next/image|.*\\..*).*)']
 };

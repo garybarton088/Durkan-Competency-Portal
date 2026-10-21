@@ -1,246 +1,192 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import PrintButton from "./PrintButton";
+'use client';
 
-export const maxDuration = 30;
+import { useEffect, useState } from 'react';
+import { usePortal } from '@/components/PortalProvider';
+import { Guard } from '@/components/ui';
+import { canSearch, scaleLabel, fmtDate } from '@/lib/constants';
 
-const LEVELS = ["Not assessed", "Just starting", "Getting there", "Solid & dependable", "Very strong", "Expert"];
-
-const CATEGORY_MAP = {
-  project_type: "projectTypes",
-  value_band: "valueBands",
-  build_type: "buildTypes",
-  client_type: "clientTypes",
-  procurement_type: "procurementTypes",
-  contract_type: "contractTypes",
-  bim_type: "bimTypes",
-  frame_type: "frameTypes",
-  refurb_type: "refurbTypes",
-  residential_type: "residentialTypes",
-  scale_band: "scaleBands",
-  constraint_type: "constraintTypes",
-  accreditation_type: "accreditationTypes",
-  material_type: "materialTypes",
-  sustainability_type: "sustainabilityTypes",
-  mmc_type: "mmcTypes",
-};
-
-const CATEGORY_LABELS = {
-  project_type: "Project types",
-  value_band: "Project values",
-  build_type: "Build types",
-  client_type: "Client types",
-  procurement_type: "Procurement types",
-  contract_type: "Contract types",
-  bim_type: "Digital / BIM experience",
-  frame_type: "Frame types",
-  refurb_type: "Refurbishment / maintenance",
-  residential_type: "Residential project types",
-  scale_band: "Scale (unit count)",
-  constraint_type: "Constraints / third parties",
-  accreditation_type: "Warranty & design accreditation",
-  material_type: "Materials",
-  sustainability_type: "M&E / sustainability",
-  mmc_type: "MMC / offsite methods",
-};
-
-function Section({ title, children }) {
+export default function ReportPage({ params }) {
   return (
-    <div className="card" style={{ padding: 16, marginBottom: 14 }}>
-      <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>{title}</h3>
-      {children}
-    </div>
+    <Guard>
+      <Report id={params.id} />
+    </Guard>
   );
 }
 
-export default async function ReportPage({ params }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { data: myProfile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+function Report({ id }) {
+  const { supabase, user, profile: me, lookups } = usePortal();
+  const [d, setD] = useState(null);
 
-  const isSelf = params.id === user.id;
-  const canView = isSelf || ["senior", "bid_team"].includes(myProfile?.role);
-  if (!canView) redirect("/staff");
+  useEffect(() => {
+    (async () => {
+      const [p, q, c, e, g, a] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', id).maybeSingle(),
+        supabase.from('qualifications').select('*').eq('staff_id', id).order('year_obtained', { ascending: false }),
+        supabase.from('client_experience').select('*').eq('staff_id', id),
+        supabase.from('staff_experience').select('*').eq('staff_id', id).order('end_year', { ascending: false }),
+        supabase.from('gateway_experience').select('*').eq('staff_id', id).order('submitted_on', { ascending: false }),
+        supabase.from('competency_assessments').select('*').eq('staff_id', id)
+      ]);
+      setD({
+        person: p.data,
+        quals: q.data || [],
+        clients: c.data || [],
+        projects: e.data || [],
+        gateway: g.data || [],
+        assess: a.data || []
+      });
+    })();
+  }, [supabase, id]);
 
-  const [
-    { data: profile },
-    { data: lookups },
-    { data: categories },
-    { data: experience },
-    { data: quals },
-    { data: assessments },
-    { data: clientExperience },
-    { data: gatewayExperience },
-  ] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", params.id).single(),
-    supabase.rpc("get_all_lookups"),
-    supabase.from("competency_categories").select("*").order("sort_order"),
-    supabase.from("staff_experience").select("*").eq("staff_id", params.id),
-    supabase.from("qualifications").select("*").eq("staff_id", params.id).order("date_obtained", { ascending: false }),
-    supabase.from("competency_assessments").select("*").eq("staff_id", params.id),
-    supabase.from("client_experience").select("*").eq("staff_id", params.id).order("created_at", { ascending: false }),
-    supabase.from("gateway_experience").select("*").eq("staff_id", params.id).order("created_at", { ascending: false }),
-  ]);
+  if (!d) return <p className="muted">Loading…</p>;
+  const person = d.person;
+  const allowed = person && (id === user.id || canSearch(me) || person.line_manager_id === user.id);
+  if (!allowed) return <div className="notice warn">This report isn&apos;t available to you.</div>;
 
-  if (!profile) redirect("/staff");
+  const clientName = (cid) => (lookups.clients || []).find((c) => c.id === cid)?.name || '';
+  const manager = (lookups.people || []).find((p) => p.id === person.line_manager_id);
+  const reviewerName = (rid) => (lookups.people || []).find((p) => p.id === rid)?.full_name || '';
+  const cats = lookups.categories || [];
+  const assessFor = (cid) => d.assess.find((a) => a.category_id === cid);
+  const hrbProjects = d.projects.filter((p) => p.is_hrb);
 
-  let manager = null;
-  if (profile.line_manager_id) {
-    const { data: m } = await supabase.from("profiles").select("full_name").eq("id", profile.line_manager_id).single();
-    manager = m;
-  }
-
-  const clientName = (entry) => {
-    if (entry.other_client_name) return entry.other_client_name;
-    const c = (lookups?.clients || []).find((x) => x.id === entry.client_id);
-    return c ? c.name : "Unknown client";
-  };
-
-  const lengthOfService = (dateStr) => {
-    if (!dateStr) return null;
-    const start = new Date(dateStr);
-    const now = new Date();
-    let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-    if (now.getDate() < start.getDate()) months -= 1;
-    const years = Math.floor(months / 12);
-    const remMonths = months % 12;
-    const parts = [];
-    if (years > 0) parts.push(`${years} year${years === 1 ? "" : "s"}`);
-    if (remMonths > 0 || years === 0) parts.push(`${remMonths} month${remMonths === 1 ? "" : "s"}`);
-    return parts.join(", ");
-  };
-
-  const groupedByCategory = Object.entries(CATEGORY_MAP).map(([cat, lookupKey]) => {
-    const ids = experience.filter((e) => e.category === cat).map((e) => e.item_id);
-    const names = (lookups?.[lookupKey] || []).filter((item) => ids.includes(item.id)).map((item) => item.name);
-    return { cat, label: CATEGORY_LABELS[cat], names };
-  }).filter((g) => g.names.length > 0);
-
-  const qualGroups = [
-    { key: "academic", label: "Academic qualifications" },
-    { key: "training", label: "Training courses" },
-    { key: "cpd", label: "CPD" },
-  ].map((g) => ({ ...g, items: quals.filter((q) => (q.qual_type || "academic") === g.key) }));
-
-  return (
-    <div style={{ maxWidth: 820 }}>
-      <style>{`
-        @media print {
-          .no-print { display: none !important; }
-          body { background: #fff !important; }
-        }
-      `}</style>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }} className="no-print">
-        <div>
-          <h2 style={{ fontSize: 19, fontWeight: 600, marginBottom: 2 }}>Staff report</h2>
-          <p style={{ fontSize: 13, color: "#5c6b78", marginTop: 0 }}>A full summary of everything on file for this person.</p>
-        </div>
-        <PrintButton />
-      </div>
-
-      <div className="card" style={{ padding: 20, marginBottom: 14 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 2 }}>{profile.full_name || "Unnamed"}</h1>
-        <div style={{ fontSize: 14, color: "#5c6b78", marginBottom: 10 }}>
-          {profile.job_title}{profile.department ? ` · ${profile.department}` : ""}{profile.business_division ? ` · ${profile.business_division}` : ""}
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 20px", fontSize: 12.5, color: "#5c6b78" }}>
-          {profile.start_date && <span>Started {new Date(profile.start_date).toLocaleDateString("en-GB", { month: "long", year: "numeric" })} ({lengthOfService(profile.start_date)})</span>}
-          {manager?.full_name && <span>Line manager: <strong style={{ color: "var(--ink)" }}>{manager.full_name}</strong></span>}
-          <span>
-            Profile status: <strong style={{ color: profile.profile_confirmed_at ? "var(--steel)" : "var(--brick)" }}>
-              {profile.profile_confirmed_at ? `Confirmed ${new Date(profile.profile_confirmed_at).toLocaleDateString("en-GB")}` : "Not yet confirmed"}
-            </strong>
-          </span>
-        </div>
-      </div>
-
-      {profile.currently_on_hrb && (
-        <div className="card" style={{ padding: 16, marginBottom: 14, borderLeft: "3px solid var(--steel)" }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Currently working on a higher-risk building</h3>
-          <div style={{ fontSize: 13 }}><strong>{profile.current_hrb_project}</strong></div>
-          {profile.current_hrb_outline && <div style={{ fontSize: 12.5, color: "#5c6b78", marginTop: 2 }}>{profile.current_hrb_outline}</div>}
-        </div>
-      )}
-
-      <Section title="CSCS card">
-        {profile.cscs_card_type && profile.cscs_card_type !== "None / Expired" ? (
-          <div style={{ fontSize: 13 }}>
-            <strong>{profile.cscs_card_type}</strong>
-            {profile.cscs_card_number && ` · ${profile.cscs_card_number}`}
-            {profile.cscs_expiry_date && ` · expires ${new Date(profile.cscs_expiry_date).toLocaleDateString("en-GB")}`}
-          </div>
-        ) : (
-          <div style={{ fontSize: 13, color: "#8a97a1" }}>None on file.</div>
-        )}
-      </Section>
-
-      <Section title="Qualifications & training">
-        {qualGroups.every((g) => g.items.length === 0) ? (
-          <div style={{ fontSize: 13, color: "#8a97a1" }}>None on file.</div>
-        ) : (
-          qualGroups.map((g) => g.items.length > 0 && (
-            <div key={g.key} style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#5c6b78", marginBottom: 4 }}>{g.label}</div>
-              {g.items.map((q) => (
-                <div key={q.id} style={{ fontSize: 13, marginBottom: 2 }}>
-                  {q.name}{q.awarding_body && ` — ${q.awarding_body}`}{q.expiry_date && ` (expires ${new Date(q.expiry_date).toLocaleDateString("en-GB")})`}
-                </div>
-              ))}
-            </div>
-          ))
-        )}
-      </Section>
-
-      <Section title="Clients & Gateway experience">
-        {clientExperience.length === 0 && gatewayExperience.length === 0 ? (
-          <div style={{ fontSize: 13, color: "#8a97a1" }}>None on file.</div>
-        ) : (
-          <>
-            {clientExperience.map((c) => (
-              <div key={c.id} style={{ fontSize: 13, marginBottom: 3 }}>
-                <strong>{clientName(c)}</strong>{c.project_name && ` — ${c.project_name}`}{c.is_durkan_job && " (Durkan job)"}
-              </div>
-            ))}
-            {gatewayExperience.map((g) => (
-              <div key={g.id} style={{ fontSize: 13, marginBottom: 3 }}>
-                <strong>{g.gateway_stage}</strong> — {g.project_name}{g.outline && `: ${g.outline}`}
-              </div>
-            ))}
-          </>
-        )}
-      </Section>
-
-      <Section title="Project experience">
-        {groupedByCategory.length === 0 ? (
-          <div style={{ fontSize: 13, color: "#8a97a1" }}>Nothing recorded yet.</div>
-        ) : (
-          groupedByCategory.map((g) => (
-            <div key={g.cat} style={{ marginBottom: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#5c6b78" }}>{g.label}: </span>
-              <span style={{ fontSize: 13 }}>{g.names.join(", ")}</span>
-            </div>
-          ))
-        )}
-      </Section>
-
-      <Section title="Competency ratings">
-        {categories.map((c) => {
-          const a = assessments.find((x) => x.category_id === c.id);
-          const level = a?.level || 0;
+  const CompTable = ({ list }) => (
+    <table className="tbl">
+      <thead>
+        <tr><th style={{ width: '34%' }}>Area</th><th>Self</th><th>Reviewed</th><th>Evidence</th></tr>
+      </thead>
+      <tbody>
+        {list.map((c) => {
+          const a = assessFor(c.id);
           return (
-            <div key={c.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid var(--line)", fontSize: 13 }}>
-              <span>{c.name}</span>
-              <span>
-                <strong>{LEVELS[level]}</strong>
-                {a?.status === "verified" && <span style={{ color: "var(--steel)", fontWeight: 600 }}> · Verified</span>}
-              </span>
-            </div>
+            <tr key={c.id}>
+              <td><b>{c.name}</b></td>
+              <td>{scaleLabel(a?.self_rating ?? 0)}</td>
+              <td>
+                {a?.reviewed_at ? (
+                  <>
+                    {scaleLabel(a.manager_rating)}
+                    <div className="small muted">{reviewerName(a.reviewed_by)} · {fmtDate(a.reviewed_at)}</div>
+                  </>
+                ) : (
+                  <span className="muted">Not yet</span>
+                )}
+              </td>
+              <td className="small">
+                {a?.self_evidence}
+                {a?.manager_comment && <div className="muted" style={{ marginTop: 4 }}>Reviewer: {a.manager_comment}</div>}
+              </td>
+            </tr>
           );
         })}
-      </Section>
+      </tbody>
+    </table>
+  );
+
+  return (
+    <div className="report">
+      <div className="row no-print" style={{ justifyContent: 'flex-end', marginBottom: 12 }}>
+        <button className="btn" onClick={() => window.print()}>Print / save as PDF</button>
+      </div>
+
+      <div className="report-head">
+        <div>
+          <h1 style={{ marginBottom: 4 }}>{person.full_name}</h1>
+          <div style={{ fontSize: 16 }}>{[person.job_title, person.department].filter(Boolean).join(' · ')}</div>
+          <div className="small muted" style={{ marginTop: 6 }}>
+            {[
+              manager && `Line manager: ${manager.full_name}`,
+              person.start_date && `Joined Durkan ${fmtDate(person.start_date)}`,
+              person.years_in_industry != null && `${person.years_in_industry} years in the industry`
+            ].filter(Boolean).join(' · ')}
+          </div>
+        </div>
+        <img src="/durkan-regen-logo.png" alt="Durkan Regen" />
+      </div>
+
+      {person.summary && (
+        <section>
+          <h2>Summary</h2>
+          <p>{person.summary}</p>
+        </section>
+      )}
+
+      <section>
+        <h2>Building Safety Act: HRB &amp; Gateway experience</h2>
+        {d.gateway.length === 0 && hrbProjects.length === 0 && <p className="muted">None recorded.</p>}
+        {d.gateway.length > 0 && (
+          <table className="tbl" style={{ marginBottom: 12 }}>
+            <thead><tr><th>Project</th><th>Stage / activity</th><th>Role</th><th>Height</th><th>Outcome</th><th>Date</th></tr></thead>
+            <tbody>
+              {d.gateway.map((g) => (
+                <tr key={g.id}>
+                  <td><b>{g.project_name}</b><div className="small muted">{clientName(g.client_id)}</div>{g.description && <div className="small">{g.description}</div>}</td>
+                  <td>{g.stage}</td><td>{g.dutyholder_role}</td><td>{g.height_band}</td><td>{g.outcome}</td><td>{fmtDate(g.submitted_on)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {hrbProjects.length > 0 && (
+          <p className="small">
+            <b>Higher-risk building projects:</b> {hrbProjects.map((p) => p.project_name + (p.storeys ? ` (${p.storeys} storeys)` : '')).join('; ')}
+          </p>
+        )}
+      </section>
+
+      <section>
+        <h2>Building Safety Act competencies</h2>
+        <CompTable list={cats.filter((c) => c.is_bsa)} />
+      </section>
+
+      <section>
+        <h2>Qualifications &amp; memberships</h2>
+        {d.quals.length === 0 ? <p className="muted">None recorded.</p> : (
+          <table className="tbl">
+            <thead><tr><th>Qualification</th><th>Body</th><th>Grade</th><th>Year</th><th>Expires</th></tr></thead>
+            <tbody>
+              {d.quals.map((q) => (
+                <tr key={q.id}><td><b>{q.title}</b><div className="small muted">{q.qual_type}</div></td><td>{q.body}</td><td>{q.grade}</td><td>{q.year_obtained}</td><td>{fmtDate(q.expiry_date)}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section>
+        <h2>Project experience</h2>
+        {d.projects.length === 0 ? <p className="muted">None recorded.</p> : d.projects.map((p) => (
+          <div className="entry" key={p.id}>
+            <h3>{p.project_name} {p.is_hrb && <span className="tag navy">HRB</span>} {p.occupied && <span className="tag">Occupied</span>}</h3>
+            <div className="kv">
+              {[
+                ['Client', clientName(p.client_id)], ['Role', p.project_role], ['Value', p.value_band],
+                ['Years', p.start_year ? `${p.start_year}–${p.end_year || 'now'}` : ''], ['Sector', p.sector],
+                ['Building', p.building_type], ['Storeys', p.storeys], ['Contract', p.contract_form],
+                ['Work', (p.work_types || []).join(', ')]
+              ].filter(([, v]) => v).map(([k, v]) => <span key={k}>{k}: <b>{v}</b></span>)}
+            </div>
+            {p.description && <p className="small" style={{ margin: '6px 0 0' }}>{p.description}</p>}
+          </div>
+        ))}
+      </section>
+
+      <section>
+        <h2>Clients</h2>
+        {d.clients.length === 0 ? <p className="muted">None recorded.</p> : (
+          <p>{d.clients.map((c) => clientName(c.client_id) + (c.years ? ` (${c.years} yrs)` : '')).join(' · ')}</p>
+        )}
+      </section>
+
+      <section>
+        <h2>Other competencies</h2>
+        <CompTable list={cats.filter((c) => !c.is_bsa)} />
+      </section>
+
+      <p className="small muted" style={{ borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+        {person.confirmed_at ? `Confirmed accurate by ${person.full_name} on ${fmtDate(person.confirmed_at)}.` : 'Not yet confirmed by the individual.'}{' '}
+        Printed {fmtDate(new Date())}. Durkan Regen competency portal.
+      </p>
     </div>
   );
 }

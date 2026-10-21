@@ -1,489 +1,394 @@
--- Durkan Competency Register — COMPLETE schema
--- Run this ONCE in a fresh Supabase project's SQL Editor. It creates
--- everything: tables, seed data, permissions, and the lookup function.
+-- =====================================================================
+-- Durkan Competency Portal: master database script
+-- ---------------------------------------------------------------------
+-- Run the WHOLE file in Supabase > SQL Editor > New query > Run.
+-- It wipes the public schema and rebuilds everything from scratch,
+-- so it is safe to re-run, but ALL portal data is deleted each time.
+-- =====================================================================
 
--- ============================================================
--- 0. BASE PRIVILEGES
--- Supabase normally sets these up automatically on a new project.
--- Included here so this script is safe to run even after a full
--- "drop schema public cascade" reset.
--- ============================================================
-grant usage on schema public to anon, authenticated, service_role;
-alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
-alter default privileges in schema public grant all on routines to anon, authenticated, service_role;
-
--- ============================================================
--- 1. PROFILES
--- ============================================================
-create table if not exists profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  full_name text not null default '',
-  role text not null default 'staff' check (role in ('staff','senior','bid_team')),
-  job_title text default '',
-  department text default '',
-  business_division text check (business_division in ('Group','Regen','Homes')),
-  start_date date,
-  cscs_card_type text,
-  cscs_card_number text,
-  cscs_expiry_date date,
-  profile_confirmed_at timestamptz,
-  line_manager_id uuid references profiles(id),
-  currently_on_hrb boolean not null default false,
-  current_hrb_project text default '',
-  current_hrb_outline text default '',
-  bsa_relevant boolean not null default false,
-  created_at timestamptz not null default now()
-);
-
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, full_name)
-  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', new.email));
-  return new;
-end;
-$$ language plpgsql security definer;
-
+-- ---------------------------------------------------------------------
+-- 0. Wipe
+-- ---------------------------------------------------------------------
 drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
+drop schema if exists public cascade;
+create schema public;
 
--- ============================================================
--- 2. LOOKUP TABLES (all tick-box categories)
--- ============================================================
-create table if not exists project_types (id serial primary key, name text unique not null, sort_order int not null default 0);
-create table if not exists value_bands (id serial primary key, name text unique not null, sort_order int not null default 0);
-create table if not exists build_types (id serial primary key, name text unique not null, sort_order int not null default 0);
-create table if not exists client_types (id serial primary key, name text unique not null, sort_order int not null default 0);
-create table if not exists procurement_types (id serial primary key, name text unique not null, sort_order int not null default 0);
-create table if not exists contract_types (id serial primary key, name text unique not null, sort_order int not null default 0);
-create table if not exists bim_types (id serial primary key, name text unique not null, sort_order int not null default 0);
-create table if not exists frame_types (id serial primary key, name text unique not null, sort_order int not null default 0);
-create table if not exists refurb_types (id serial primary key, name text unique not null, sort_order int not null default 0);
-create table if not exists residential_types (id serial primary key, name text unique not null, sort_order int not null default 0);
-create table if not exists scale_bands (id serial primary key, name text unique not null, sort_order int not null default 0);
-create table if not exists constraint_types (id serial primary key, name text unique not null, sort_order int not null default 0);
-create table if not exists accreditation_types (id serial primary key, name text unique not null, sort_order int not null default 0);
-create table if not exists material_types (id serial primary key, name text unique not null, sort_order int not null default 0);
-create table if not exists sustainability_types (id serial primary key, name text unique not null, sort_order int not null default 0);
-create table if not exists mmc_types (id serial primary key, name text unique not null, sort_order int not null default 0);
+grant usage on schema public to postgres, anon, authenticated, service_role;
+grant all on schema public to postgres, service_role;
+alter default privileges in schema public grant all on tables    to postgres, anon, authenticated, service_role;
+alter default privileges in schema public grant all on functions to postgres, anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to postgres, anon, authenticated, service_role;
 
-create table if not exists clients (
-  id serial primary key,
-  name text unique not null,
-  category text not null check (category in ('housing_association', 'local_authority')),
-  sort_order int not null default 0
+-- ---------------------------------------------------------------------
+-- 1. Tables
+-- ---------------------------------------------------------------------
+create table public.profiles (
+  id               uuid primary key references auth.users(id) on delete cascade,
+  email            text,
+  full_name        text,
+  job_title        text,
+  department       text,
+  office           text,
+  phone            text,
+  line_manager_id  uuid references public.profiles(id) on delete set null,
+  start_date       date,
+  years_in_industry int,
+  summary          text,
+  role             text not null default 'staff' check (role in ('staff','senior','bid_team')),
+  confirmed_at     timestamptz,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now(),
+  constraint not_own_manager check (line_manager_id is null or line_manager_id <> id)
 );
 
-insert into project_types (name, sort_order) values
-  ('Residential', 1), ('Education', 2), ('Healthcare', 3), ('Commercial / offices', 4),
-  ('Retail', 5), ('Leisure', 6), ('Industrial / logistics', 7), ('Infrastructure', 8),
-  ('Mixed-use', 9), ('Public sector', 10)
-on conflict (name) do nothing;
+-- All tick-box lists live in one table, keyed by list_key.
+create table public.lookup_values (
+  id          bigint generated always as identity primary key,
+  list_key    text not null,
+  label       text not null,
+  sort_order  int  not null default 0,
+  active      boolean not null default true,
+  unique (list_key, label)
+);
 
-insert into value_bands (name, sort_order) values
-  ('Under £1m', 1), ('£1m - £5m', 2), ('£5m - £15m', 3), ('£15m - £50m', 4), ('£50m+', 5)
-on conflict (name) do nothing;
+create table public.clients (
+  id          bigint generated always as identity primary key,
+  name        text not null unique,
+  client_type text,
+  created_by  uuid references public.profiles(id) on delete set null default auth.uid(),
+  created_at  timestamptz not null default now()
+);
 
-insert into build_types (name, sort_order) values
-  ('New build', 1), ('Refurbishment', 2), ('Fit-out', 3), ('Retrofit / energy upgrade', 4),
-  ('Modular / MMC', 5), ('Heritage / listed building', 6),
-  ('High-rise / HRB (new build)', 7), ('High-rise / HRB (regeneration)', 8)
-on conflict (name) do nothing;
+create table public.qualifications (
+  id             bigint generated always as identity primary key,
+  staff_id       uuid not null references public.profiles(id) on delete cascade default auth.uid(),
+  qual_type      text,
+  title          text not null,
+  body           text,
+  grade          text,
+  year_obtained  int,
+  expiry_date    date,
+  reference      text,
+  created_at     timestamptz not null default now()
+);
 
-insert into client_types (name, sort_order) values
-  ('Local authorities', 1), ('Housing associations', 2), ('Private clients', 3), ('Other public sector', 4)
-on conflict (name) do nothing;
-
-insert into procurement_types (name, sort_order) values
-  ('Single-stage tender', 1), ('Negotiated', 2), ('PCSA', 3), ('Two-stage tender', 4)
-on conflict (name) do nothing;
-
-insert into contract_types (name, sort_order) values
-  ('JCT', 1), ('NEC3', 2), ('NEC4', 3), ('Design & Build', 4),
-  ('Traditional / lump sum', 5), ('Management contract', 6), ('Framework', 7)
-on conflict (name) do nothing;
-
-insert into bim_types (name, sort_order) values
-  ('ISO 19650', 1), ('BIM Level 2', 2), ('Common data environment (CDE)', 3),
-  ('BIM authoring (Revit, Navisworks etc.)', 4), ('Digital twin / Level 3 BIM', 5)
-on conflict (name) do nothing;
-
-insert into frame_types (name, sort_order) values
-  ('Concrete frame', 1), ('Pre-cast columns / walls', 2), ('Slip / jump cores', 3), ('Post-tensioned concrete', 4),
-  ('Timber frame', 5), ('Steel frame', 6), ('Light gauge frame', 7), ('Traditional', 8),
-  ('Volumetric modular', 9), ('CLT', 10)
-on conflict (name) do nothing;
-
-insert into refurb_types (name, sort_order) values
-  ('Planned maintenance (internals)', 1), ('Planned maintenance (externals)', 2),
-  ('Cladding refurbishment / renewal / replacement', 3), ('M&E refurbishment', 4), ('Concrete repairs', 5),
-  ('Fire remedials (fire stopping, doors etc.)', 6), ('Reactive maintenance', 7), ('Retrofit (EWI etc.)', 8)
-on conflict (name) do nothing;
-
-insert into residential_types (name, sort_order) values
-  ('Housing', 1), ('PRS / BTR', 2), ('Shared ownership', 3), ('Affordable', 4), ('Wheelchair', 5),
-  ('Care home', 6), ('Extra care', 7), ('Refurbishment', 8), ('Library', 9)
-on conflict (name) do nothing;
-
-insert into scale_bands (name, sort_order) values
-  ('0-50 units', 1), ('50-100 units', 2), ('100-150 units', 3), ('150-250 units', 4), ('250+ units', 5)
-on conflict (name) do nothing;
-
-insert into constraint_types (name, sort_order) values
-  ('Network Rail', 1), ('London Underground', 2), ('TfL', 3), ('Canal & River Trust', 4),
-  ('Port of London Authority', 5), ('Environment Agency', 6), ('Historic England', 7), ('MOLAS', 8)
-on conflict (name) do nothing;
-
-insert into accreditation_types (name, sort_order) values
-  ('NHBC', 1), ('LABC', 2), ('Premier Guarantee', 3), ('Home Quality Mark', 4),
-  ('Secure by Design', 5), ('Building for Life', 6), ('Residents in Place', 7), ('Party Wall Awards', 8)
-on conflict (name) do nothing;
-
-insert into material_types (name, sort_order) values
-  ('Panelised cladding', 1), ('Green roofs', 2), ('Brown roofs', 3), ('Blue roofs', 4)
-on conflict (name) do nothing;
-
-insert into sustainability_types (name, sort_order) values
-  ('Code for Sustainable Homes Level 4', 1), ('Code for Sustainable Homes Level 5', 2), ('Code for Sustainable Homes Level 6', 3),
-  ('PassivHaus', 4), ('MVHR / MEV', 5), ('Biomass boilers', 6), ('Air source heat pumps', 7), ('Ground source heat', 8),
-  ('Solar thermal', 9), ('PV panels', 10), ('Gas boilers', 11), ('District heating', 12),
-  ('BREEAM Good', 13), ('BREEAM Very Good', 14), ('BREEAM Excellent', 15), ('SBEM', 16), ('Retrofit / PAS2035', 17)
-on conflict (name) do nothing;
-
-insert into mmc_types (name, sort_order) values
-  ('SIPS', 1), ('Bathroom pods', 2), ('Thin joint', 3), ('Utility pods', 4), ('Pre-fab plant rooms', 5)
-on conflict (name) do nothing;
-
-insert into clients (name, category, sort_order) values
-  ('L&Q (London & Quadrant)', 'housing_association', 1),
-  ('Peabody', 'housing_association', 2),
-  ('Southern Housing', 'housing_association', 3),
-  ('Clarion Housing Group', 'housing_association', 4),
-  ('Notting Hill Genesis', 'housing_association', 5),
-  ('Metropolitan Thames Valley (MTVH)', 'housing_association', 6),
-  ('Sovereign Network Group', 'housing_association', 7),
-  ('Hyde Group', 'housing_association', 8),
-  ('A2Dominion', 'housing_association', 9),
-  ('Network Homes', 'housing_association', 10),
-  ('Riverside Group', 'housing_association', 11),
-  ('Guinness Partnership', 'housing_association', 12),
-  ('Home Group', 'housing_association', 13),
-  ('Orbit Group', 'housing_association', 14),
-  ('Paragon Asra Housing', 'housing_association', 15),
-  ('Places for People', 'housing_association', 16),
-  ('Sanctuary Housing', 'housing_association', 17),
-  ('Origin Housing', 'housing_association', 18),
-  ('Moat Homes', 'housing_association', 19),
-  ('Vivid Homes', 'housing_association', 20),
-  ('Radian', 'housing_association', 21),
-  ('Abri Group', 'housing_association', 22),
-  ('Watford Community Housing', 'housing_association', 23),
-  ('Grand Union Housing Group', 'housing_association', 24)
-on conflict (name) do nothing;
-
-insert into clients (name, category, sort_order) values
-  ('Barking and Dagenham', 'local_authority', 1),
-  ('Barnet', 'local_authority', 2),
-  ('Bexley', 'local_authority', 3),
-  ('Brent', 'local_authority', 4),
-  ('Bromley', 'local_authority', 5),
-  ('Camden', 'local_authority', 6),
-  ('City of London', 'local_authority', 7),
-  ('Croydon', 'local_authority', 8),
-  ('Ealing', 'local_authority', 9),
-  ('Enfield', 'local_authority', 10),
-  ('Greenwich', 'local_authority', 11),
-  ('Hackney', 'local_authority', 12),
-  ('Hammersmith and Fulham', 'local_authority', 13),
-  ('Haringey', 'local_authority', 14),
-  ('Harrow', 'local_authority', 15),
-  ('Havering', 'local_authority', 16),
-  ('Hillingdon', 'local_authority', 17),
-  ('Hounslow', 'local_authority', 18),
-  ('Islington', 'local_authority', 19),
-  ('Kensington and Chelsea', 'local_authority', 20),
-  ('Kingston upon Thames', 'local_authority', 21),
-  ('Lambeth', 'local_authority', 22),
-  ('Lewisham', 'local_authority', 23),
-  ('Merton', 'local_authority', 24),
-  ('Newham', 'local_authority', 25),
-  ('Redbridge', 'local_authority', 26),
-  ('Richmond upon Thames', 'local_authority', 27),
-  ('Southwark', 'local_authority', 28),
-  ('Sutton', 'local_authority', 29),
-  ('Tower Hamlets', 'local_authority', 30),
-  ('Waltham Forest', 'local_authority', 31),
-  ('Wandsworth', 'local_authority', 32),
-  ('Westminster', 'local_authority', 33)
-on conflict (name) do nothing;
-
--- ============================================================
--- 3. STAFF EXPERIENCE (tick-box records) & QUALIFICATIONS
--- ============================================================
-create table if not exists staff_experience (
-  id uuid primary key default gen_random_uuid(),
-  staff_id uuid not null references profiles(id) on delete cascade,
-  category text not null check (category in (
-    'project_type','value_band','build_type','client_type','procurement_type','contract_type','bim_type',
-    'frame_type','refurb_type','residential_type','scale_band','constraint_type','accreditation_type',
-    'material_type','sustainability_type','mmc_type'
-  )),
-  item_id int not null,
+create table public.client_experience (
+  id         bigint generated always as identity primary key,
+  staff_id   uuid not null references public.profiles(id) on delete cascade default auth.uid(),
+  client_id  bigint not null references public.clients(id) on delete cascade,
+  years      numeric(4,1),
+  notes      text,
   created_at timestamptz not null default now(),
-  unique (staff_id, category, item_id)
+  unique (staff_id, client_id)
 );
 
-create table if not exists qualifications (
-  id uuid primary key default gen_random_uuid(),
-  staff_id uuid not null references profiles(id) on delete cascade,
-  name text not null,
-  awarding_body text default '',
-  date_obtained date,
-  expiry_date date,
-  certificate_ref text default '',
-  qual_type text not null default 'academic' check (qual_type in ('academic', 'training', 'cpd')),
-  created_at timestamptz not null default now()
+create table public.staff_experience (
+  id              bigint generated always as identity primary key,
+  staff_id        uuid not null references public.profiles(id) on delete cascade default auth.uid(),
+  project_name    text not null,
+  client_id       bigint references public.clients(id) on delete set null,
+  location        text,
+  sector          text,
+  building_type   text,
+  work_types      text[] not null default '{}',
+  contract_form   text,
+  procurement     text,
+  project_role    text,
+  value_band      text,
+  start_year      int,
+  end_year        int,
+  is_hrb          boolean not null default false,
+  storeys         int,
+  occupied        boolean not null default false,
+  description     text,
+  created_at      timestamptz not null default now()
 );
 
-create table if not exists client_experience (
-  id uuid primary key default gen_random_uuid(),
-  staff_id uuid not null references profiles(id) on delete cascade,
-  client_id int references clients(id),
-  other_client_name text default '',
-  project_name text not null default '',
-  is_durkan_job boolean not null default true,
-  created_at timestamptz not null default now()
+create table public.gateway_experience (
+  id               bigint generated always as identity primary key,
+  staff_id         uuid not null references public.profiles(id) on delete cascade default auth.uid(),
+  project_name     text not null,
+  client_id        bigint references public.clients(id) on delete set null,
+  stage            text not null,
+  dutyholder_role  text,
+  height_band      text,
+  outcome          text,
+  submitted_on     date,
+  description      text,
+  created_at       timestamptz not null default now()
 );
 
-create table if not exists gateway_experience (
-  id uuid primary key default gen_random_uuid(),
-  staff_id uuid not null references profiles(id) on delete cascade,
-  project_name text not null default '',
-  gateway_stage text not null default 'Gateway 2' check (gateway_stage in ('Gateway 2', 'Gateway 3', 'Gateway 2 & 3')),
-  outline text default '',
-  created_at timestamptz not null default now()
+create table public.competency_categories (
+  id          bigint generated always as identity primary key,
+  name        text not null unique,
+  description text,
+  is_bsa      boolean not null default false,
+  sort_order  int not null default 0
 );
 
--- ============================================================
--- 4. BSA COMPETENCY CATEGORIES & ASSESSMENTS
--- ============================================================
-create table if not exists competency_categories (
-  id text primary key,
-  name text not null,
-  description text not null default '',
-  sort_order int not null default 0
-);
-
-insert into competency_categories (id, name, description, sort_order) values
-  ('TDC', 'Technical & discipline competence', 'Your practical, hands-on expertise in your own discipline — the day-to-day craft of your role, whether that''s running a site, coordinating a design, or controlling costs.', 1),
-  ('BFS', 'Building & fire safety', 'Your understanding of how buildings stay safe once built and occupied — fire strategy, structural integrity, and how a building physically behaves — with particular weight on higher-risk buildings (tall or complex schemes).', 2),
-  ('BSA', 'Legal & regulatory (Building Safety Act)', 'Your practical knowledge of the Building Safety Act 2022 — what it requires at each Gateway checkpoint, and how to keep the paper trail (the Golden Thread) that shows a building was designed and built safely.', 3),
-  ('HSW', 'Health & safety', 'Your role in keeping people safe — whether that''s day-to-day site safety, CDM 2015 duties, or making sure the work you plan, design or oversee is delivered without unnecessary risk.', 4),
-  ('BEH', 'Behavioural & ethical', 'How you work with others — communicating clearly, collaborating well, and feeling able to speak up if something looks wrong.', 5),
-  ('MGT', 'Management & assurance', 'If you manage a team: how you make sure the people under you are genuinely competent for what they''re doing, and step in if they''re not. Mainly relevant to Principal Contractor/Designer-type duty holders.', 6)
-on conflict (id) do nothing;
-
-create table if not exists competency_assessments (
-  id uuid primary key default gen_random_uuid(),
-  staff_id uuid not null references profiles(id) on delete cascade,
-  category_id text not null references competency_categories(id),
-  level int not null default 0 check (level between 0 and 5),
-  evidence text default '',
-  status text not null default 'self_assessed' check (status in ('self_assessed','pending_verification','verified')),
-  verified_by uuid references profiles(id),
-  verified_at timestamptz,
-  last_assessed date,
-  expiry_date date,
-  updated_at timestamptz not null default now(),
+create table public.competency_assessments (
+  id               bigint generated always as identity primary key,
+  staff_id         uuid not null references public.profiles(id) on delete cascade,
+  category_id      bigint not null references public.competency_categories(id) on delete cascade,
+  self_rating      int check (self_rating between 0 and 5),
+  self_evidence    text,
+  self_updated_at  timestamptz,
+  manager_rating   int check (manager_rating between 0 and 5),
+  manager_comment  text,
+  reviewed_by      uuid references public.profiles(id) on delete set null,
+  reviewed_at      timestamptz,
   unique (staff_id, category_id)
 );
 
--- ============================================================
--- 5. ROW LEVEL SECURITY
--- ============================================================
-alter table profiles enable row level security;
-alter table staff_experience enable row level security;
-alter table qualifications enable row level security;
-alter table competency_assessments enable row level security;
-alter table project_types enable row level security;
-alter table value_bands enable row level security;
-alter table build_types enable row level security;
-alter table client_types enable row level security;
-alter table procurement_types enable row level security;
-alter table contract_types enable row level security;
-alter table bim_types enable row level security;
-alter table frame_types enable row level security;
-alter table refurb_types enable row level security;
-alter table residential_types enable row level security;
-alter table scale_bands enable row level security;
-alter table constraint_types enable row level security;
-alter table accreditation_types enable row level security;
-alter table material_types enable row level security;
-alter table sustainability_types enable row level security;
-alter table mmc_types enable row level security;
-alter table clients enable row level security;
-alter table client_experience enable row level security;
-alter table gateway_experience enable row level security;
-alter table competency_categories enable row level security;
+create index on public.staff_experience (staff_id);
+create index on public.qualifications (staff_id);
+create index on public.client_experience (staff_id);
+create index on public.gateway_experience (staff_id);
+create index on public.competency_assessments (staff_id);
+create index on public.profiles (line_manager_id);
 
-drop policy if exists "lookups readable by all logged in users" on project_types;
-create policy "lookups readable by all logged in users" on project_types for select using (auth.role() = 'authenticated');
-drop policy if exists "lookups readable by all logged in users" on value_bands;
-create policy "lookups readable by all logged in users" on value_bands for select using (auth.role() = 'authenticated');
-drop policy if exists "lookups readable by all logged in users" on build_types;
-create policy "lookups readable by all logged in users" on build_types for select using (auth.role() = 'authenticated');
-drop policy if exists "lookups readable by all logged in users" on client_types;
-create policy "lookups readable by all logged in users" on client_types for select using (auth.role() = 'authenticated');
-drop policy if exists "lookups readable by all logged in users" on procurement_types;
-create policy "lookups readable by all logged in users" on procurement_types for select using (auth.role() = 'authenticated');
-drop policy if exists "lookups readable by all logged in users" on contract_types;
-create policy "lookups readable by all logged in users" on contract_types for select using (auth.role() = 'authenticated');
-drop policy if exists "lookups readable by all logged in users" on bim_types;
-create policy "lookups readable by all logged in users" on bim_types for select using (auth.role() = 'authenticated');
-drop policy if exists "lookups readable by all logged in users" on frame_types;
-create policy "lookups readable by all logged in users" on frame_types for select using (auth.role() = 'authenticated');
-drop policy if exists "lookups readable by all logged in users" on refurb_types;
-create policy "lookups readable by all logged in users" on refurb_types for select using (auth.role() = 'authenticated');
-drop policy if exists "lookups readable by all logged in users" on residential_types;
-create policy "lookups readable by all logged in users" on residential_types for select using (auth.role() = 'authenticated');
-drop policy if exists "lookups readable by all logged in users" on scale_bands;
-create policy "lookups readable by all logged in users" on scale_bands for select using (auth.role() = 'authenticated');
-drop policy if exists "lookups readable by all logged in users" on constraint_types;
-create policy "lookups readable by all logged in users" on constraint_types for select using (auth.role() = 'authenticated');
-drop policy if exists "lookups readable by all logged in users" on accreditation_types;
-create policy "lookups readable by all logged in users" on accreditation_types for select using (auth.role() = 'authenticated');
-drop policy if exists "lookups readable by all logged in users" on material_types;
-create policy "lookups readable by all logged in users" on material_types for select using (auth.role() = 'authenticated');
-drop policy if exists "lookups readable by all logged in users" on sustainability_types;
-create policy "lookups readable by all logged in users" on sustainability_types for select using (auth.role() = 'authenticated');
-drop policy if exists "lookups readable by all logged in users" on mmc_types;
-create policy "lookups readable by all logged in users" on mmc_types for select using (auth.role() = 'authenticated');
-create policy "lookups readable by all logged in users" on clients for select using (auth.role() = 'authenticated');
-drop policy if exists "categories readable by all logged in users" on competency_categories;
-create policy "categories readable by all logged in users" on competency_categories for select using (auth.role() = 'authenticated');
-
-drop policy if exists "profiles readable by all logged in users" on profiles;
-create policy "profiles readable by all logged in users" on profiles for select using (auth.role() = 'authenticated');
-drop policy if exists "users update own profile" on profiles;
-create policy "users update own profile" on profiles for update using (id = auth.uid()) with check (id = auth.uid());
-
-drop policy if exists "senior can update any profile" on profiles;
-create policy "senior can update any profile" on profiles for update
-  using (exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'senior'))
-  with check (exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'senior'));
-
-drop policy if exists "read all experience" on staff_experience;
-create policy "read all experience" on staff_experience for select using (auth.role() = 'authenticated');
-drop policy if exists "manage own experience" on staff_experience;
-create policy "manage own experience" on staff_experience for insert with check (staff_id = auth.uid());
-drop policy if exists "delete own experience" on staff_experience;
-create policy "delete own experience" on staff_experience for delete using (staff_id = auth.uid());
-
-drop policy if exists "read all qualifications" on qualifications;
-create policy "read all qualifications" on qualifications for select using (auth.role() = 'authenticated');
-drop policy if exists "manage own qualifications" on qualifications;
-create policy "manage own qualifications" on qualifications for insert with check (staff_id = auth.uid());
-drop policy if exists "update own qualifications" on qualifications;
-create policy "update own qualifications" on qualifications for update using (staff_id = auth.uid()) with check (staff_id = auth.uid());
-drop policy if exists "delete own qualifications" on qualifications;
-create policy "delete own qualifications" on qualifications for delete using (staff_id = auth.uid());
-
-drop policy if exists "read all client experience" on client_experience;
-create policy "read all client experience" on client_experience for select using (auth.role() = 'authenticated');
-drop policy if exists "manage own client experience" on client_experience;
-create policy "manage own client experience" on client_experience for insert with check (staff_id = auth.uid());
-drop policy if exists "update own client experience" on client_experience;
-create policy "update own client experience" on client_experience for update using (staff_id = auth.uid()) with check (staff_id = auth.uid());
-drop policy if exists "delete own client experience" on client_experience;
-create policy "delete own client experience" on client_experience for delete using (staff_id = auth.uid());
-
-drop policy if exists "read all gateway experience" on gateway_experience;
-create policy "read all gateway experience" on gateway_experience for select using (auth.role() = 'authenticated');
-drop policy if exists "manage own gateway experience" on gateway_experience;
-create policy "manage own gateway experience" on gateway_experience for insert with check (staff_id = auth.uid());
-drop policy if exists "delete own gateway experience" on gateway_experience;
-create policy "delete own gateway experience" on gateway_experience for delete using (staff_id = auth.uid());
-
-drop policy if exists "read all assessments" on competency_assessments;
-create policy "read all assessments" on competency_assessments for select using (auth.role() = 'authenticated');
-
-drop policy if exists "staff insert own assessment" on competency_assessments;
-create policy "staff insert own assessment" on competency_assessments for insert
-  with check (staff_id = auth.uid() and status <> 'verified');
-
-drop policy if exists "staff update own assessment" on competency_assessments;
-create policy "staff update own assessment" on competency_assessments for update
-  using (staff_id = auth.uid())
-  with check (staff_id = auth.uid() and status <> 'verified');
-
-drop policy if exists "senior can verify any assessment" on competency_assessments;
-create policy "senior can verify any assessment" on competency_assessments for update
-  using (exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'senior'))
-  with check (exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'senior'));
-
-drop policy if exists "manager can verify direct reports" on competency_assessments;
-create policy "manager can verify direct reports" on competency_assessments for update
-  using (exists (select 1 from profiles p where p.id = competency_assessments.staff_id and p.line_manager_id = auth.uid()))
-  with check (exists (select 1 from profiles p where p.id = competency_assessments.staff_id and p.line_manager_id = auth.uid()));
-
--- ============================================================
--- 6. SEARCH VIEW (for the bid team's Tender Search page)
--- ============================================================
-create or replace view staff_overview as
-select
-  p.id,
-  p.full_name,
-  p.job_title,
-  p.business_division,
-  p.department,
-  p.bsa_relevant,
-  p.profile_confirmed_at,
-  coalesce(
-    jsonb_object_agg(ca.category_id, jsonb_build_object('level', ca.level, 'status', ca.status))
-      filter (where ca.category_id is not null),
-    '{}'::jsonb
-  ) as competencies
-from profiles p
-left join competency_assessments ca on ca.staff_id = p.id
-group by p.id;
-
--- ============================================================
--- 7. ONE-CALL LOOKUP FUNCTION (keeps page loads fast)
--- ============================================================
-create or replace function get_all_lookups()
-returns json
-language sql
-stable
-as $$
-  select json_build_object(
-    'projectTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from project_types t),
-    'valueBands', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from value_bands t),
-    'buildTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from build_types t),
-    'clientTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from client_types t),
-    'procurementTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from procurement_types t),
-    'contractTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from contract_types t),
-    'bimTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from bim_types t),
-    'frameTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from frame_types t),
-    'refurbTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from refurb_types t),
-    'residentialTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from residential_types t),
-    'scaleBands', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from scale_bands t),
-    'constraintTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from constraint_types t),
-    'accreditationTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from accreditation_types t),
-    'materialTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from material_types t),
-    'sustainabilityTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from sustainability_types t),
-    'mmcTypes', (select coalesce(json_agg(row_to_json(t) order by t.sort_order), '[]') from mmc_types t),
-    'clients', (select coalesce(json_agg(row_to_json(t) order by t.category, t.sort_order), '[]') from clients t)
-  );
+-- ---------------------------------------------------------------------
+-- 2. Helper functions (security definer so RLS policies don't recurse)
+-- ---------------------------------------------------------------------
+create or replace function public.my_role() returns text
+language sql stable security definer set search_path = public as $$
+  select role from public.profiles where id = auth.uid()
 $$;
 
-grant execute on function get_all_lookups() to authenticated;
+create or replace function public.is_senior() returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce((select role = 'senior' from public.profiles where id = auth.uid()), false)
+$$;
 
--- ============================================================
--- 8. TABLE-LEVEL GRANTS (must come after tables exist)
--- ============================================================
-grant all on all tables in schema public to anon, authenticated, service_role;
-grant all on all sequences in schema public to anon, authenticated, service_role;
-grant all on all routines in schema public to anon, authenticated, service_role;
+create or replace function public.can_search() returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce((select role in ('senior','bid_team') from public.profiles where id = auth.uid()), false)
+$$;
+
+create or replace function public.manages(staff uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = staff and line_manager_id = auth.uid())
+$$;
+
+create or replace function public.can_view_staff(staff uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select staff = auth.uid() or public.can_search() or public.manages(staff)
+$$;
+
+-- ---------------------------------------------------------------------
+-- 3. Triggers
+-- ---------------------------------------------------------------------
+-- New sign-up -> profile row
+create or replace function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.profiles (id, email, full_name)
+  values (new.id, new.email, coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email,'@',1)))
+  on conflict (id) do nothing;
+  return new;
+end $$;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- Staff can't promote themselves. Role changes only via the table editor / SQL editor.
+create or replace function public.protect_profile() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is not null and new.role is distinct from old.role then
+    raise exception 'Role can only be changed by an administrator';
+  end if;
+  new.updated_at := now();
+  return new;
+end $$;
+
+create trigger profiles_protect
+  before update on public.profiles
+  for each row execute function public.protect_profile();
+
+-- Competency rows: the person edits their own self-assessment only;
+-- a reviewer (line manager or senior, never the person themself) edits the review fields only.
+create or replace function public.guard_assessment() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then
+    return new;  -- SQL editor / service role
+  end if;
+
+  if auth.uid() = new.staff_id then
+    if tg_op = 'INSERT' then
+      new.manager_rating := null; new.manager_comment := null;
+      new.reviewed_by := null;    new.reviewed_at := null;
+    else
+      new.manager_rating := old.manager_rating; new.manager_comment := old.manager_comment;
+      new.reviewed_by := old.reviewed_by;       new.reviewed_at := old.reviewed_at;
+    end if;
+    new.self_updated_at := now();
+  else
+    if not (public.manages(new.staff_id) or public.is_senior()) then
+      raise exception 'Only the line manager or a senior can review this';
+    end if;
+    if tg_op = 'INSERT' then
+      new.self_rating := null; new.self_evidence := null; new.self_updated_at := null;
+    else
+      new.self_rating := old.self_rating; new.self_evidence := old.self_evidence;
+      new.self_updated_at := old.self_updated_at;
+    end if;
+    new.reviewed_by := auth.uid();
+    new.reviewed_at := now();
+  end if;
+  return new;
+end $$;
+
+create trigger assessments_guard
+  before insert or update on public.competency_assessments
+  for each row execute function public.guard_assessment();
+
+-- ---------------------------------------------------------------------
+-- 4. Row-level security
+-- ---------------------------------------------------------------------
+alter table public.profiles               enable row level security;
+alter table public.lookup_values          enable row level security;
+alter table public.clients                enable row level security;
+alter table public.qualifications         enable row level security;
+alter table public.client_experience      enable row level security;
+alter table public.staff_experience       enable row level security;
+alter table public.gateway_experience     enable row level security;
+alter table public.competency_categories  enable row level security;
+alter table public.competency_assessments enable row level security;
+
+-- Profiles: everyone signed in can see names (needed to pick a line manager); you edit only your own.
+create policy profiles_select on public.profiles for select to authenticated using (true);
+create policy profiles_update on public.profiles for update to authenticated
+  using (id = auth.uid()) with check (id = auth.uid());
+
+-- Reference data
+create policy lookups_select on public.lookup_values for select to authenticated using (true);
+create policy categories_select on public.competency_categories for select to authenticated using (true);
+create policy clients_select on public.clients for select to authenticated using (true);
+create policy clients_insert on public.clients for insert to authenticated with check (true);
+
+-- Personal evidence tables: you, your line manager, seniors and the bid team can read; only you can write.
+do $$
+declare t text;
+begin
+  foreach t in array array['qualifications','client_experience','staff_experience','gateway_experience'] loop
+    execute format('create policy %1$s_select on public.%1$s for select to authenticated using (public.can_view_staff(staff_id))', t);
+    execute format('create policy %1$s_insert on public.%1$s for insert to authenticated with check (staff_id = auth.uid())', t);
+    execute format('create policy %1$s_update on public.%1$s for update to authenticated using (staff_id = auth.uid()) with check (staff_id = auth.uid())', t);
+    execute format('create policy %1$s_delete on public.%1$s for delete to authenticated using (staff_id = auth.uid())', t);
+  end loop;
+end $$;
+
+-- Competencies
+create policy assess_select on public.competency_assessments for select to authenticated
+  using (public.can_view_staff(staff_id));
+create policy assess_insert on public.competency_assessments for insert to authenticated
+  with check (staff_id = auth.uid()
+              or (staff_id <> auth.uid() and (public.manages(staff_id) or public.is_senior())));
+create policy assess_update on public.competency_assessments for update to authenticated
+  using (staff_id = auth.uid()
+         or (staff_id <> auth.uid() and (public.manages(staff_id) or public.is_senior())))
+  with check (staff_id = auth.uid()
+         or (staff_id <> auth.uid() and (public.manages(staff_id) or public.is_senior())));
+
+-- ---------------------------------------------------------------------
+-- 5. View for the dashboard
+-- ---------------------------------------------------------------------
+create view public.staff_overview with (security_invoker = on) as
+select
+  p.id, p.full_name, p.email, p.job_title, p.department, p.office, p.role,
+  p.line_manager_id, m.full_name as line_manager_name, p.confirmed_at, p.updated_at,
+  (select count(*) from public.qualifications q where q.staff_id = p.id)                         as qualifications,
+  (select count(*) from public.client_experience c where c.staff_id = p.id)                      as clients,
+  (select count(*) from public.staff_experience e where e.staff_id = p.id)                       as projects,
+  (select count(*) from public.staff_experience e where e.staff_id = p.id and e.is_hrb)          as hrb_projects,
+  (select count(*) from public.gateway_experience g where g.staff_id = p.id)                     as gateway_entries,
+  (select count(*) from public.competency_assessments a where a.staff_id = p.id and a.self_rating > 0)       as competencies_rated,
+  (select count(*) from public.competency_assessments a where a.staff_id = p.id and a.reviewed_at is not null) as competencies_reviewed
+from public.profiles p
+left join public.profiles m on m.id = p.line_manager_id;
+
+-- ---------------------------------------------------------------------
+-- 6. One-call lookup loader (avoids many round trips / 504s)
+-- ---------------------------------------------------------------------
+create or replace function public.get_all_lookups() returns json
+language sql stable security invoker set search_path = public as $$
+  select json_build_object(
+    'lists', coalesce((
+      select json_object_agg(list_key, items) from (
+        select list_key, json_agg(label order by sort_order, label) as items
+        from public.lookup_values where active group by list_key
+      ) s), '{}'::json),
+    'clients', coalesce((
+      select json_agg(json_build_object('id', id, 'name', name, 'client_type', client_type) order by name)
+      from public.clients), '[]'::json),
+    'categories', coalesce((
+      select json_agg(json_build_object('id', id, 'name', name, 'description', description, 'is_bsa', is_bsa) order by sort_order)
+      from public.competency_categories), '[]'::json),
+    'people', coalesce((
+      select json_agg(json_build_object('id', id, 'full_name', full_name, 'job_title', job_title,
+                                        'department', department, 'line_manager_id', line_manager_id) order by full_name)
+      from public.profiles), '[]'::json)
+  )
+$$;
+
+-- ---------------------------------------------------------------------
+-- 7. Seed data
+-- ---------------------------------------------------------------------
+insert into public.lookup_values (list_key, label, sort_order)
+select k, v, ord from (values
+  ('department', array['Regen','Refurbishment','New Build','Technical','Building Safety','Quality','Design Management','Commercial','Pre-construction & Bids','Health & Safety','Digital Delivery','Operations','Other']),
+  ('office',     array['Head office','Regional office','Site-based','Hybrid']),
+  ('qual_type',  array['Degree','Postgraduate degree','HNC / HND','NVQ / SVQ','Professional membership','Chartership','Health & safety (SMSTS, SSSTS, NEBOSH)','Fire safety','CSCS / skills card','Short course / CPD','Other']),
+  ('professional_body', array['CIOB','RICS','ICE','IStructE','CIBSE','RIBA','CIAT','IFE','IOSH','APM','CABE','Other']),
+  ('sector',     array['Social housing – occupied refurbishment','Social housing – new build','Private residential','Build to rent','Student accommodation','Care / extra care','Education','Healthcare','Mixed use','Commercial','Other']),
+  ('building_type', array['High-rise residential (18m+ or 7+ storeys)','Mid-rise residential (11m–18m)','Low-rise residential (under 11m)','Houses','Mixed use','Non-residential','Other']),
+  ('work_type',  array['Fire safety remediation','Cladding / external wall remediation','Fire stopping & compartmentation','Window & door replacement','Roofing','Internal refurbishment / Decent Homes','Energy retrofit / decarbonisation','M&E upgrades','Structural works','New build','Estate regeneration','Planned maintenance','Other']),
+  ('contract_form', array['JCT Design & Build','JCT Standard Building Contract','JCT Intermediate','NEC3 / NEC4 ECC','NEC Term Service','PPC2000 / TAC-1 / FAC-1','Framework call-off','Other']),
+  ('procurement', array['Single-stage tender','Two-stage tender','Framework – direct award','Framework – mini-competition','Negotiated','Partnering','Other']),
+  ('project_role', array['Project Director','Project Manager','Contracts Manager','Site Manager','Assistant Site Manager','Design Manager','Technical Manager','Quality Manager','Building Safety Manager','Commercial Manager / QS','Resident Liaison Officer','Bid Manager','Estimator','Health & Safety Advisor','Other']),
+  ('value_band', array['Under £1m','£1m–£5m','£5m–£10m','£10m–£25m','£25m–£50m','£50m+']),
+  ('dutyholder_role', array['Principal Contractor','Principal Designer','Contractor','Designer','Client','Supporting the Accountable Person','Building Safety Manager']),
+  ('gateway_stage', array['Gateway 1 – planning','Gateway 2 – building control approval','Gateway 3 – completion certificate','Major change control','Notifiable change','Golden thread & handover','Mandatory occurrence reporting']),
+  ('gateway_outcome', array['Approved','Approved with requirements','Rejected and resubmitted','In progress','Withdrawn']),
+  ('height_band', array['Under 11m','11m–18m','18m+ (HRB)','30m+ (HRB)']),
+  ('client_type', array['Local authority','Housing association','Private landlord','Developer','Education','Health','Other'])
+) as t(k, labels)
+cross join lateral unnest(labels) with ordinality as u(v, ord);
+
+insert into public.competency_categories (name, description, is_bsa, sort_order) values
+  ('Building Safety Act & the HRB regime', 'You understand the Building Safety Act 2022, the higher-risk building regime and how dutyholder duties apply to the work you do.', true, 1),
+  ('Gateways & Building Safety Regulator engagement', 'You can prepare, contribute to or manage Gateway 2 and Gateway 3 applications and respond to Regulator queries.', true, 2),
+  ('Fire safety & compartmentation', 'You understand fire strategies, compartmentation, fire stopping and how to inspect and evidence them.', true, 3),
+  ('Golden thread & information management', 'You keep accurate, accessible building information and know what the golden thread needs to contain.', true, 4),
+  ('Change control & occurrence reporting', 'You recognise major and notifiable changes, follow change control and know when and how to report mandatory occurrences.', true, 5),
+  ('Principal Contractor duties (CDM & BSA)', 'You understand and carry out Principal Contractor duties under both CDM 2015 and the Building Regulations dutyholder regime.', true, 6),
+  ('Building Regulations & technical standards', 'You apply the Approved Documents, British Standards and manufacturer guidance correctly to your work.', false, 7),
+  ('Design management & coordination', 'You manage design information, coordinate designers and make sure what is built matches what was approved.', false, 8),
+  ('Quality management & inspection', 'You plan and carry out inspections, test plans and record evidence that work is right first time.', false, 9),
+  ('Health & safety', 'You plan and manage work safely, including RAMS, temporary works and supervision.', false, 10),
+  ('Resident engagement & occupied works', 'You plan and deliver work in occupied homes with care, clear communication and respect for residents.', false, 11),
+  ('Commercial & contract management', 'You understand the contract, manage change and protect the commercial position.', false, 12),
+  ('Programme & project delivery', 'You plan, sequence and deliver work to programme, managing risk and subcontractors.', false, 13),
+  ('Sustainability & retrofit', 'You understand energy retrofit, PAS 2035 and low-carbon approaches.', false, 14),
+  ('Digital delivery (CDE & BIM)', 'You use the common data environment and digital tools to manage and share information.', false, 15),
+  ('Leadership & people', 'You lead, coach and develop others and build effective teams.', false, 16);
+
+-- Backfill profiles for anyone already in auth.users (only matters if you didn't start a new Supabase project)
+insert into public.profiles (id, email, full_name)
+select id, email, coalesce(raw_user_meta_data->>'full_name', split_part(email,'@',1)) from auth.users
+on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------
+-- 8. Grants (needed after a schema wipe)
+-- ---------------------------------------------------------------------
+grant all on all tables    in schema public to postgres, anon, authenticated, service_role;
+grant all on all sequences in schema public to postgres, anon, authenticated, service_role;
+grant all on all functions in schema public to postgres, anon, authenticated, service_role;
+
+-- ---------------------------------------------------------------------
+-- 9. After you've signed up in the portal, make yourself senior:
+--    update public.profiles set role = 'senior' where email = 'you@durkan.co.uk';
+-- ---------------------------------------------------------------------

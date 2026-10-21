@@ -1,51 +1,53 @@
-# Durkan Competency Register — clean setup
+# Durkan Regen Competency Portal
 
-This is the complete, current version of the app in one package. Follow these
-steps in order for a fresh, reliable setup.
+Staff competency, experience and Building Safety Act evidence for Durkan Regen.
+Staff fill in their own profile, line managers and seniors review competency ratings,
+and the bid team searches the data to staff tenders.
 
-## 1. Reset Supabase (reuse the same project)
+**Stack:** Next.js 14 (App Router, plain JS) · Supabase (auth, Postgres, row-level security) · Vercel.
 
-1. Go to your existing Supabase project → SQL Editor → New query.
-2. Paste in the entire contents of `supabase/schema.sql` from this package and click Run.
-   It's safe to run even though some tables already exist — everything uses
-   "if not exists" so nothing is deleted or duplicated.
-3. Go to Table Editor → `profiles`, find your own row, and set `role` to `senior`
-   (new signups always start as `staff`).
+## Pages
 
-## 2. Start a brand new GitHub repository
+| Path | Who | What |
+|---|---|---|
+| `/login` | Everyone | Sign in, sign up, forgotten password |
+| `/` | Signed in | Welcome, why we're doing this, what to do |
+| `/staff` | Signed in | Tabbed profile: Basic details, Qualifications, Clients, Project experience, Competencies, HRB & Gateway, Review & confirm |
+| `/verify` | Line managers, seniors | Review direct reports (seniors: anyone except themselves) |
+| `/dashboard` | Senior, bid team | Coverage and compliance |
+| `/search` | Senior, bid team | Tender search |
+| `/report/[id]` | The person, their line manager, senior, bid team | Printable report |
 
-1. Go to github.com → create a **new** repository (e.g. `durkan-competency-v2`).
-   Leave it empty — no README, no .gitignore.
-2. On the empty repo's page, click **"uploading an existing file"**.
-3. In File Explorer on your computer, open the unzipped `durkan-app-final`
-   folder, select **everything inside it** (Ctrl+A) — not the folder itself —
-   and drag all of it into the browser's upload box.
-4. Scroll down, make sure **"Commit directly to the main branch"** is selected
-   (not "Create a new branch"), and click Commit.
-5. Confirm on the repo's main page that you see `app`, `lib`, `public`,
-   `supabase`, `package.json` etc. listed directly — not nested inside another
-   folder. This matters: it avoids the "Root Directory" confusion from before.
+## Set-up
 
-## 3. Start a brand new Vercel project
+1. **Supabase:** create a project. Open SQL Editor, paste all of `supabase/schema.sql` and run it.
+   The script wipes and rebuilds the `public` schema, so it is safe to re-run but deletes portal data.
+2. **Supabase > Authentication > URL Configuration:** set *Site URL* to the live Vercel address and add
+   `https://<your-domain>/auth/callback` to *Redirect URLs*.
+3. **Vercel:** import this repo (Root Directory blank, framework Next.js) and add two environment variables:
+   - `NEXT_PUBLIC_SUPABASE_URL`: the project URL, ending `.supabase.co` and nothing after it
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: the anon / publishable key
+4. Sign up in the portal, then make yourself senior in the SQL editor:
+   `update public.profiles set role = 'senior' where email = 'you@durkan.co.uk';`
 
-1. In Vercel, click **Add New → Project**, find your new repository, click Import.
-2. Leave build settings as default — don't set a Root Directory this time,
-   since the files are at the repo's top level.
-3. Expand **Environment Variables** and add exactly two, as **Config** type
-   (not Secret — Config is correct for values that need to reach the browser):
-   - `NEXT_PUBLIC_SUPABASE_URL` — from Supabase → Settings → API Settings →
-     Project URL (just `https://xxxxx.supabase.co`, nothing after `.co`)
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — from Supabase → Settings → API Keys →
-     the anon/public/publishable key
-4. Click Deploy.
+## Roles
 
-## 4. Test
+`profiles.role` is `staff` (default), `senior` or `bid_team`. Change it in the Supabase table editor
+or SQL editor. Users can't change their own role.
 
-1. Open the live URL Vercel gives you.
-2. Sign in with the account you already created (or make a new one).
-3. Check "My profile" loads promptly with all the sections, and "Tender search"
-   works if your account is senior/bid_team.
+## Security rules (enforced in the database)
 
-If anything is slow or times out this time, it's worth checking Supabase's
-own Logs → API Gateway to see whether requests are arriving there quickly —
-that was the key diagnostic that helped last time.
+- Everyone signed in can see names and job titles (to pick a line manager).
+- Evidence (qualifications, clients, projects, gateway, competencies) is visible to the person,
+  their line manager, seniors and the bid team. Only the person can edit their own evidence.
+- Competency reviews: the line manager or a senior can set the reviewed rating and comment.
+  Nobody can review their own entries, and reviewers can't change the self-assessment.
+
+## Data model
+
+- `profiles`, `lookup_values` (all tick-box lists, keyed by `list_key`), `clients`
+- `qualifications`, `client_experience`, `staff_experience`, `gateway_experience`
+- `competency_categories`, `competency_assessments`
+- View `staff_overview`; RPC `get_all_lookups()` returns all lists, clients, categories and people in one call.
+
+To add or rename a tick-box option, edit `lookup_values` in the table editor. No code change needed.

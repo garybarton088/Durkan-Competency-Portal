@@ -1,171 +1,153 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
+'use client';
 
-export const maxDuration = 30;
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { usePortal } from '@/components/PortalProvider';
+import { Guard, Select } from '@/components/ui';
+import { canSearch, fmtDate, ROLES } from '@/lib/constants';
 
-function daysUntil(dateStr) {
-  if (!dateStr) return null;
-  const diff = (new Date(dateStr) - new Date(new Date().toISOString().slice(0, 10))) / 86400000;
-  return Math.round(diff);
-}
-
-function Metric({ label, value, accent }) {
+export default function DashboardPage() {
   return (
-    <div className="card" style={{ padding: "14px 16px" }}>
-      <div className="lbl">{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 600, color: accent || "var(--ink)", fontFamily: "'Space Grotesk', sans-serif" }}>{value}</div>
-    </div>
+    <Guard allow={canSearch}>
+      <Dashboard />
+    </Guard>
   );
 }
 
-export default async function DashboardPage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { data: myProfile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+function Dashboard() {
+  const { supabase, list, lookups } = usePortal();
+  const [rows, setRows] = useState(null);
+  const [assess, setAssess] = useState([]);
+  const [dept, setDept] = useState(null);
+  const [err, setErr] = useState('');
 
-  if (!["senior", "bid_team"].includes(myProfile?.role)) {
-    redirect("/staff");
-  }
+  useEffect(() => {
+    (async () => {
+      const [o, a] = await Promise.all([
+        supabase.from('staff_overview').select('*').order('full_name'),
+        supabase.from('competency_assessments').select('staff_id, category_id, self_rating, manager_rating, reviewed_at')
+      ]);
+      if (o.error) setErr(o.error.message);
+      setRows(o.data || []);
+      setAssess(a.data || []);
+    })();
+  }, [supabase]);
 
-  const [{ data: profiles }, { data: categories }, { data: assessments }, { data: quals }, { data: gatewayExp }] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, job_title, business_division, cscs_card_type, cscs_expiry_date, profile_confirmed_at, currently_on_hrb, current_hrb_project"),
-    supabase.from("competency_categories").select("*").order("sort_order"),
-    supabase.from("competency_assessments").select("staff_id, category_id, level, status"),
-    supabase.from("qualifications").select("id, staff_id, name, expiry_date, profiles!qualifications_staff_id_fkey(full_name)").not("expiry_date", "is", null),
-    supabase.from("gateway_experience").select("staff_id, project_name, gateway_stage, profiles!gateway_experience_staff_id_fkey(full_name)"),
-  ]);
+  const filtered = useMemo(() => (rows || []).filter((r) => !dept || r.department === dept), [rows, dept]);
+  const ids = useMemo(() => new Set(filtered.map((r) => r.id)), [filtered]);
+  const cats = lookups.categories || [];
 
-  const allProfiles = profiles || [];
-  const allAssessments = assessments || [];
-  const allQuals = quals || [];
+  if (!rows) return <p className="muted">Loading…</p>;
 
-  const totalStaff = allProfiles.length;
-  const confirmedCount = allProfiles.filter((p) => p.profile_confirmed_at).length;
-  const confirmedPct = totalStaff ? Math.round((confirmedCount / totalStaff) * 100) : 0;
-  const verificationBacklog = allAssessments.filter((a) => a.status === "self_assessed" && a.level > 0).length;
+  const n = filtered.length || 1;
+  const confirmed = filtered.filter((r) => r.confirmed_at).length;
+  const stale = filtered.filter((r) => r.confirmed_at && Date.now() - new Date(r.confirmed_at) > 183 * 864e5).length;
+  const withHrb = filtered.filter((r) => r.hrb_projects > 0).length;
+  const withGw = filtered.filter((r) => r.gateway_entries > 0).length;
+  const totalRated = filtered.reduce((s, r) => s + Number(r.competencies_rated || 0), 0);
+  const totalReviewed = filtered.reduce((s, r) => s + Number(r.competencies_reviewed || 0), 0);
 
-  const categoryStats = (categories || []).map((c) => {
-    const catAssessments = allAssessments.filter((a) => a.category_id === c.id);
-    const rated = catAssessments.filter((a) => a.level > 0);
-    const verified = catAssessments.filter((a) => a.status === "verified");
-    const avg = rated.length ? rated.reduce((sum, a) => sum + a.level, 0) / rated.length : 0;
-    return { ...c, ratedCount: rated.length, verifiedCount: verified.length, avg };
+  // Coverage: people at "Solid & dependable" (3) or above, using the reviewed rating where there is one
+  const coverage = cats.map((c) => {
+    const rel = assess.filter((a) => a.category_id === c.id && ids.has(a.staff_id));
+    const strong = rel.filter((a) => (a.reviewed_at ? a.manager_rating : a.self_rating) >= 3).length;
+    const verified = rel.filter((a) => a.reviewed_at && a.manager_rating >= 3).length;
+    return { ...c, strong, verified };
   });
 
-  const cscsAlerts = allProfiles
-    .filter((p) => p.cscs_expiry_date)
-    .map((p) => ({ name: p.full_name, label: `CSCS card (${p.cscs_card_type || "type not set"})`, days: daysUntil(p.cscs_expiry_date) }))
-    .filter((a) => a.days !== null && a.days <= 60);
-
-  const qualAlerts = allQuals
-    .map((q) => ({ name: q.profiles?.full_name || "Unknown", label: q.name, days: daysUntil(q.expiry_date) }))
-    .filter((a) => a.days !== null && a.days <= 60);
-
-  const alerts = [...cscsAlerts, ...qualAlerts].sort((a, b) => a.days - b.days);
-
-  const hrbStaff = allProfiles.filter((p) => p.currently_on_hrb);
-  const gatewayList = gatewayExp || [];
-  const hrbRelevantIds = new Set([...hrbStaff.map((p) => p.id), ...gatewayList.map((g) => g.staff_id)]);
-  const hrbRelevantCount = hrbRelevantIds.size;
-
   return (
-    <div>
-      <h2 style={{ fontSize: 19, fontWeight: 600, marginBottom: 2 }}>Coverage & compliance</h2>
-      <p style={{ fontSize: 13, color: "#5c6b78", marginTop: 0, marginBottom: 20 }}>
-        A company-wide view of profile completion, competency coverage, and upcoming expiries.
-      </p>
+    <>
+      <div className="spread">
+        <h1>Dashboard</h1>
+        <div style={{ minWidth: 240 }}>
+          <Select value={dept} onChange={setDept} options={list('department')} placeholder="All departments" />
+        </div>
+      </div>
+      {err && <div className="notice err">{err}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 24 }}>
-        <Metric label="Total staff" value={totalStaff} />
-        <Metric label="Profiles confirmed" value={`${confirmedPct}%`} accent={confirmedPct < 60 ? "var(--brick)" : undefined} />
-        <Metric label="Awaiting verification" value={verificationBacklog} accent={verificationBacklog > 0 ? "var(--steel)" : undefined} />
-        <Metric label="Expiring within 60 days" value={alerts.length} accent={alerts.length > 0 ? "var(--brick)" : undefined} />
-        <Metric label="HRB / Gateway relevant" value={hrbRelevantCount} accent={hrbRelevantCount > 0 ? "var(--steel)" : undefined} />
+      <div className="grid grid-4" style={{ margin: '12px 0 28px' }}>
+        <Stat n={filtered.length} l="People signed up" />
+        <Stat n={`${Math.round((confirmed / n) * 100)}%`} l={`Profiles confirmed (${confirmed})`} />
+        <Stat n={stale} l="Confirmed over 6 months ago" />
+        <Stat n={withHrb} l="People with HRB project experience" />
+        <Stat n={withGw} l="People with Gateway experience" />
+        <Stat n={totalRated ? `${Math.round((totalReviewed / totalRated) * 100)}%` : '—'} l="Self-ratings reviewed" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 16 }}>
-        <div className="card" style={{ padding: 16 }}>
-          <h3 style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 12 }}>Competency coverage by area</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {categoryStats.map((c) => (
-              <div key={c.id}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                  <span className="mono" style={{ color: "#5c6b78" }}>{c.id} · {c.name}</span>
-                  <span style={{ fontWeight: 600 }}>
-                    {c.ratedCount}/{totalStaff} rated · {c.verifiedCount} verified
-                  </span>
-                </div>
-                <div style={{ display: "flex", gap: 2 }}>
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} style={{ height: 7, flex: 1, borderRadius: 1, background: c.avg >= i ? "var(--steel)" : "#E1E5E8" }} />
-                  ))}
-                </div>
+      <div className="grid grid-2" style={{ alignItems: 'start' }}>
+        <div className="card">
+          <h2>Competency coverage</h2>
+          <p className="small muted">People rated “Solid &amp; dependable” or above. The darker bar shows ratings confirmed by a reviewer.</p>
+          {coverage.map((c) => (
+            <div key={c.id} style={{ marginBottom: 12 }}>
+              <div className="spread small">
+                <span>
+                  {c.name} {c.is_bsa && <span className="tag navy">BSA</span>}
+                </span>
+                <b>
+                  {c.strong} <span className="muted">({c.verified} verified)</span>
+                </b>
               </div>
-            ))}
-            {categoryStats.length === 0 && <div style={{ fontSize: 12.5, color: "#8a97a1" }}>No competency data yet.</div>}
-          </div>
-        </div>
-
-        <div className="card" style={{ padding: 16 }}>
-          <h3 style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 12 }}>Expiring soon or overdue</h3>
-          {alerts.length === 0 ? (
-            <div style={{ fontSize: 13, color: "#5c6b78" }}>Nothing expiring in the next 60 days.</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflowY: "auto" }}>
-              {alerts.map((a, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 9px", borderRadius: 3, border: "1px solid var(--line)", fontSize: 12.5 }}>
-                  <span><strong style={{ fontWeight: 600 }}>{a.name}</strong> <span style={{ color: "#5c6b78" }}>· {a.label}</span></span>
-                  <span style={{ color: a.days < 0 ? "var(--brick)" : "var(--steel)", fontWeight: 600, whiteSpace: "nowrap" }}>
-                    {a.days < 0 ? "Expired" : `${a.days}d left`}
-                  </span>
-                </div>
-              ))}
+              <div className="bar" style={{ position: 'relative' }}>
+                <i style={{ width: `${(c.strong / n) * 100}%`, opacity: 0.45 }} />
+                <i style={{ width: `${(c.verified / n) * 100}%`, position: 'absolute', top: 0, left: 0 }} />
+              </div>
             </div>
-          )}
+          ))}
+        </div>
+
+        <div className="card">
+          <h2>Who needs a nudge</h2>
+          <p className="small muted">Not yet confirmed, or not yet told us who their line manager is.</p>
+          {filtered.filter((r) => !r.confirmed_at || !r.line_manager_id).slice(0, 25).map((r) => (
+            <div key={r.id} className="spread small" style={{ padding: '6px 0', borderBottom: '1px solid var(--line)' }}>
+              <span><b>{r.full_name}</b> <span className="muted">{r.email}</span></span>
+              <span>
+                {!r.line_manager_id && <span className="tag amber">No manager</span>}{' '}
+                {!r.confirmed_at && <span className="tag">Not confirmed</span>}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className="card" style={{ padding: 16, marginTop: 16 }}>
-        <h3 style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 4 }}>Higher-risk building & Gateway priority list</h3>
-        <p style={{ fontSize: 12, color: "#5c6b78", marginBottom: 12 }}>
-          These are the people where competency evidence needs to hold up most — currently on an HRB, or with BSR Gateway experience. Verification for this group should get closest attention from line managers.
-        </p>
-        {hrbRelevantCount === 0 ? (
-          <div style={{ fontSize: 13, color: "#5c6b78" }}>No one has flagged HRB or Gateway experience yet.</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {hrbStaff.map((p) => (
-              <div key={"hrb-" + p.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 9px", border: "1px solid var(--line)", borderRadius: 3, fontSize: 12.5 }}>
-                <span><strong>{p.full_name}</strong> <span style={{ color: "#5c6b78" }}>· {p.job_title}</span></span>
-                <span style={{ color: "var(--steel)", fontWeight: 600 }}>Currently on: {p.current_hrb_project || "HRB (project not named)"}</span>
-              </div>
+      <h2 style={{ marginTop: 32 }}>Everyone</h2>
+      <div className="card table-wrap" style={{ padding: 0 }}>
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Name</th><th>Department</th><th>Line manager</th><th>Quals</th><th>Projects</th><th>HRB</th><th>Gateway</th>
+              <th>Rated</th><th>Reviewed</th><th>Confirmed</th><th>Access</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r) => (
+              <tr key={r.id}>
+                <td><Link href={`/report/${r.id}`}><b>{r.full_name}</b></Link><div className="small muted">{r.job_title}</div></td>
+                <td>{r.department}</td>
+                <td>{r.line_manager_name || <span className="tag amber">None</span>}</td>
+                <td>{r.qualifications}</td>
+                <td>{r.projects}</td>
+                <td>{r.hrb_projects}</td>
+                <td>{r.gateway_entries}</td>
+                <td>{r.competencies_rated}/{cats.length}</td>
+                <td>{r.competencies_reviewed}</td>
+                <td>{r.confirmed_at ? fmtDate(r.confirmed_at) : '—'}</td>
+                <td>{ROLES[r.role] || r.role}</td>
+              </tr>
             ))}
-            {gatewayList.map((g, i) => (
-              <div key={"gw-" + i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 9px", border: "1px solid var(--line)", borderRadius: 3, fontSize: 12.5 }}>
-                <span><strong>{g.profiles?.full_name || "Unknown"}</strong></span>
-                <span style={{ color: "var(--steel)", fontWeight: 600 }}>{g.gateway_stage}: {g.project_name}</span>
-              </div>
-            ))}
-          </div>
-        )}
+          </tbody>
+        </table>
       </div>
+    </>
+  );
+}
 
-      <div className="card" style={{ padding: 16, marginTop: 16 }}>
-        <h3 style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 12 }}>Staff who haven't confirmed their profile</h3>
-        {allProfiles.filter((p) => !p.profile_confirmed_at).length === 0 ? (
-          <div style={{ fontSize: 13, color: "#5c6b78" }}>Everyone has confirmed their profile.</div>
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {allProfiles.filter((p) => !p.profile_confirmed_at).map((p) => (
-              <span key={p.id} style={{ fontSize: 12.5, padding: "4px 10px", background: "#EAF2EF", borderRadius: 12 }}>
-                {p.full_name || "Unnamed"}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
+function Stat({ n, l }) {
+  return (
+    <div className="stat">
+      <div className="n">{n}</div>
+      <div className="l">{l}</div>
     </div>
   );
 }
