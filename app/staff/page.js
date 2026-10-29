@@ -6,6 +6,7 @@ import { usePortal } from '@/components/PortalProvider';
 import { Guard, Field, Select, ScalePicker } from '@/components/ui';
 import EntryList from '@/components/EntryList';
 import { scaleLabel, fmtDate } from '@/lib/constants';
+import { friendlyError } from '@/lib/errors';
 
 const TABS = ['Basic details', 'Qualifications', 'Clients', 'Project experience', 'Competencies', 'HRB & Gateway', 'Review & confirm'];
 
@@ -136,7 +137,7 @@ function BasicDetails({ onSaved }) {
       })
       .eq('id', user.id);
     setSaving(false);
-    if (error) return setMsg({ type: 'err', text: error.message });
+    if (error) return setMsg({ type: 'err', text: friendlyError(error) });
     setMsg({ type: 'ok', text: 'Saved.' });
     await Promise.all([reloadProfile(), reloadLookups()]);
     onSaved();
@@ -179,7 +180,7 @@ function ChangePassword() {
   async function go() {
     if (pw.length < 8) return setMsg({ type: 'err', text: 'Use at least 8 characters.' });
     const { error } = await supabase.auth.updateUser({ password: pw });
-    setMsg(error ? { type: 'err', text: error.message } : { type: 'ok', text: 'Password updated.' });
+    setMsg(error ? { type: 'err', text: friendlyError(error) } : { type: 'ok', text: 'Password updated.' });
     if (!error) setPw('');
   }
   return (
@@ -346,7 +347,7 @@ function CompetencyCard({ cat, row, onSaved }) {
     const { error } = await supabase
       .from('competency_assessments')
       .upsert({ staff_id: user.id, category_id: cat.id, self_rating: rating, self_evidence: evidence.trim() || null }, { onConflict: 'staff_id,category_id' });
-    if (error) return setState(error.message);
+    if (error) return setState(friendlyError(error));
     setEvidence(evidence.trim());
     setState('saved');
     onSaved();

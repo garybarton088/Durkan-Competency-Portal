@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePortal } from '@/components/PortalProvider';
 import { Guard, Select } from '@/components/ui';
 import { canSearch, fmtDate, ROLES } from '@/lib/constants';
+import { friendlyError } from '@/lib/errors';
 
 export default function DashboardPage() {
   return (
@@ -27,7 +28,7 @@ function Dashboard() {
         supabase.from('staff_overview').select('*').order('full_name'),
         supabase.from('competency_assessments').select('staff_id, category_id, self_rating, manager_rating, reviewed_at')
       ]);
-      if (o.error) setErr(o.error.message);
+      if (o.error) setErr(friendlyError(o.error));
       setRows(o.data || []);
       setAssess(a.data || []);
     })();

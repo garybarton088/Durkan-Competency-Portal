@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePortal } from '@/components/PortalProvider';
 import { ConfigMissing } from '@/components/ui';
+import { friendlyError } from '@/lib/errors';
 
 export default function LoginPage() {
   const { supabase, configured, reloadProfile } = usePortal();
@@ -67,7 +68,7 @@ export default function LoginPage() {
     } catch (err) {
       const text = /database error saving new user/i.test(err.message || '')
         ? 'Please use your Durkan email address (ending @durkan.co.uk).'
-        : err.message || 'Something went wrong.';
+        : friendlyError(err) || 'Something went wrong.';
       setMsg({ type: 'err', text });
     }
     setBusy(false);

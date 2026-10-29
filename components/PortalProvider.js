@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { getSupabase, supabaseConfigured } from '@/lib/supabase/client';
+import { friendlyError } from '@/lib/errors';
 
 const PortalContext = createContext(null);
 
@@ -40,7 +41,7 @@ export function PortalProvider({ children }) {
       return;
     }
     const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-    setState({ loading: false, user, profile: profile || null, error: error ? error.message : null });
+    setState({ loading: false, user, profile: profile || null, error: friendlyError(error) });
     loadLookups();
   }, [supabase, loadLookups]);
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { usePortal } from './PortalProvider';
 import { Field, Select, Chips, ClientPicker } from './ui';
+import { friendlyError } from '@/lib/errors';
 
 const SENSITIVE_HINT = "Work details only. Please don't include health or other sensitive personal information about yourself or anyone else.";
 
@@ -20,7 +21,7 @@ export default function EntryList({ table, fields, title, meta, orderBy = 'creat
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.from(table).select('*').eq('staff_id', user.id).order(orderBy, { ascending });
-    if (error) setErr(error.message);
+    if (error) setErr(friendlyError(error));
     setRows(data || []);
     setLoading(false);
   }, [supabase, user, table, orderBy, ascending]);
@@ -58,7 +59,7 @@ export default function EntryList({ table, fields, title, meta, orderBy = 'creat
       : supabase.from(table).insert({ ...payload, staff_id: user.id });
     const { error } = await q;
     setSaving(false);
-    if (error) return setErr(error.message);
+    if (error) return setErr(friendlyError(error));
     setForm(null);
     await load();
     onChange && onChange();
@@ -67,7 +68,7 @@ export default function EntryList({ table, fields, title, meta, orderBy = 'creat
   async function remove(row) {
     if (!window.confirm('Delete this entry?')) return;
     const { error } = await supabase.from(table).delete().eq('id', row.id);
-    if (error) return setErr(error.message);
+    if (error) return setErr(friendlyError(error));
     await load();
     onChange && onChange();
   }

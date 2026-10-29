@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePortal } from './PortalProvider';
 import { SCALE } from '@/lib/constants';
 import { configProblem } from '@/lib/supabase/client';
+import { friendlyError } from '@/lib/errors';
 
 export function Field({ label, children, hint }) {
   return (
@@ -98,7 +99,7 @@ export function ClientPicker({ value, onChange }) {
       return;
     }
     const { data, error } = await supabase.from('clients').insert({ name: clean, client_type: type || null }).select().single();
-    if (error) return setErr(error.message);
+    if (error) return setErr(friendlyError(error));
     await reloadLookups();
     onChange(data.id);
     setAdding(false);

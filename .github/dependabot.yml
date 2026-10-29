@@ -1,0 +1,15 @@
+# Weekly checks for security fixes in the portal's packages (OWASP A03).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      supabase:
+        patterns: ["@supabase/*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

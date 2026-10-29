@@ -21,7 +21,8 @@ and the bid team searches the data to staff tenders.
 ## Set-up
 
 1. **Supabase:** create a project. Open SQL Editor, paste all of `supabase/schema.sql` and run it.
-   The script wipes and rebuilds the `public` schema, so it is safe to re-run but deletes portal data.
+   It builds everything from scratch, and refuses to run once anyone has signed up (it would delete all data).
+   Changes to the live portal go in numbered files in `supabase/updates/`, run once each in the SQL Editor.
 2. **Supabase > Authentication > URL Configuration:** set *Site URL* to the live Vercel address and add
    `https://<your-domain>/auth/callback` to *Redirect URLs*.
 3. **Vercel:** import this repo (Root Directory blank, framework Next.js) and add two environment variables:
@@ -37,11 +38,22 @@ or SQL editor. Users can't change their own role.
 
 ## Security rules (enforced in the database)
 
-- Everyone signed in can see names and job titles (to pick a line manager).
+- Everyone signed in can see names, job titles and departments (to pick a line manager). Full profiles
+  (phone, start date, summary) are visible only to the person, their line manager, seniors and the bid team.
+- Signed-out visitors have no access to any table or function.
+- Every insert, update and delete on personal data is written to `audit_log` (who, when, before, after).
+  Only seniors can read it, and nobody can change it from the portal.
 - Evidence (qualifications, clients, projects, gateway, competencies) is visible to the person,
   their line manager, seniors and the bid team. Only the person can edit their own evidence.
 - Competency reviews: the line manager or a senior can set the reviewed rating and comment.
   Nobody can review their own entries, and reviewers can't change the self-assessment.
+
+## Security
+
+- Security headers (CSP, frame blocking, HSTS, referrer and permissions policy) are set in `next.config.js`.
+- `.github/workflows/security.yml` builds the site and runs `npm audit` on every push and weekly.
+- Dependabot opens pull requests for package security fixes.
+- Errors shown to users go through `lib/errors.js`, so raw database messages aren't displayed.
 
 ## Data model
 

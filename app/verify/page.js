@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePortal } from '@/components/PortalProvider';
 import { Guard, Field, ScalePicker } from '@/components/ui';
 import { scaleLabel, fmtDate } from '@/lib/constants';
+import { friendlyError } from '@/lib/errors';
 
 export default function VerifyPage() {
   return (
@@ -157,7 +158,7 @@ function ReviewCard({ staffId, cat, row, onSaved }) {
     const { error } = await supabase
       .from('competency_assessments')
       .upsert({ staff_id: staffId, category_id: cat.id, manager_rating: rating, manager_comment: comment.trim() || null }, { onConflict: 'staff_id,category_id' });
-    if (error) return setState(error.message);
+    if (error) return setState(friendlyError(error));
     setState('saved');
     onSaved();
   }
