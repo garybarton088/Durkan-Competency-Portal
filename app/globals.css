@@ -1,8 +1,8 @@
 :root {
-  --navy: #8b1a1a;
-  --navy-2: #a52a1f;
-  --teal: #e8590c;
-  --teal-soft: #fff0e6;
+  --navy: #002856;
+  --navy-2: #0e3a6b;
+  --teal: #008c79;
+  --teal-soft: #e3f3f0;
   --ink: #14202e;
   --muted: #5b6878;
   --line: #dfe4ea;
@@ -107,7 +107,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .bar { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; }
 .bar > i { display: block; height: 100%; background: var(--teal); }
 
-.notice { padding: 12px 14px; border-radius: 8px; background: var(--teal-soft); color: #9a3a06; font-size: 14px; }
+.notice { padding: 12px 14px; border-radius: 8px; background: var(--teal-soft); color: #00574b; font-size: 14px; }
 .notice.warn { background: var(--amber-soft); color: #7a4a00; }
 .notice.err { background: #fdecea; color: var(--red); }
 
